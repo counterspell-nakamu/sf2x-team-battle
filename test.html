@@ -241,6 +241,73 @@
       font-size: 10px;
       border-radius: 2px;
     }
+
+    /* モーダル表示 */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-content {
+      background: var(--panel-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      width: 90%;
+      max-width: 500px;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      padding: 16px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    }
+
+    .modal-header {
+      font-size: 16px;
+      font-weight: bold;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-body {
+      overflow-y: auto;
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding-right: 4px;
+    }
+
+    .order-item {
+      background: var(--card-bg);
+      padding: 6px 10px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--border-color);
+    }
+
+    .order-item select {
+      background: #111;
+      color: #fff;
+      border: 1px solid var(--border-color);
+      padding: 2px 4px;
+      border-radius: 3px;
+    }
+
+    .modal-footer {
+      margin-top: 12px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
   </style>
 </head>
 <body>
@@ -335,10 +402,34 @@
     </div>
   </div>
 
+  <!-- オーダー設定モーダルダイアログ -->
+  <div class="modal-overlay" id="order-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span id="modal-title">🔴 1Pチーム オーダー設定</span>
+        <button class="btn btn-xs" onclick="closeOrderModal()">✕</button>
+      </div>
+      <div style="margin-bottom: 8px;">
+        <button id="btn-modal-shuffle" class="btn btn-orange" style="width: 100%;">🔀 現在のルールで並び替え実行</button>
+      </div>
+      <div class="modal-body" id="modal-order-list"></div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeOrderModal()">キャンセル</button>
+        <button id="btn-save-order" class="btn btn-green">確定・保存</button>
+      </div>
+    </div>
+  </div>
+
   <script>
+    // スパ2X 16キャラクター定義
+    const CHARACTERS = [
+      'リュウ', 'ケン', 'チュンリー', 'ガイル', 'ブランカ', 'ザンギエフ', 'ダルシム', 'エドモンド本田',
+      'バイソン', 'バルログ', 'サガット', 'ベガ', 'キャミィ', 'ディージェイ', 'サンダーホーク', 'フェイロン'
+    ];
+
     // --- アプリケーション状態管理 ---
     let state = {
-      maxSlots: 16, // 各チームのデフォルト枠数
+      maxSlots: 16,
       room: 'default',
       playersMaster: ['サコー', 'ナカム〜', 'ぐっち', 'こたか', 'サシシ'],
       p1Team: [],
@@ -346,6 +437,9 @@
       p1Bench: [],
       p2Bench: []
     };
+
+    let currentEditingTeam = 'p1'; // 'p1' or 'p2'
+    let editingTeamTemp = []; // モーダル編集用の作業配列
 
     // 初期化関数
     function init() {
@@ -379,10 +473,20 @@
         }
       });
 
-      // 自動振り分けボタンの処理
+      // 自動振り分けボタン
       document.getElementById('btn-auto-assign').addEventListener('click', () => {
         autoAssignCheckedPlayers();
       });
+
+      // オーダー設定ボタン (1P / 2P)
+      document.getElementById('btn-order-p1').addEventListener('click', () => openOrderModal('p1'));
+      document.getElementById('btn-order-p2').addEventListener('click', () => openOrderModal('p2'));
+
+      // モーダル内シャッフル実行
+      document.getElementById('btn-modal-shuffle').addEventListener('click', () => runOrderRule());
+
+      // オーダー確定保存
+      document.getElementById('btn-save-order').addEventListener('click', () => saveOrderModal());
 
       // 部屋移動ボタン
       document.getElementById('btn-change-room').addEventListener('click', () => {
@@ -392,6 +496,105 @@
           document.getElementById('room-display').innerText = roomVal;
         }
       });
+    }
+
+    // オーダーモーダルを開く
+    function openOrderModal(teamKey) {
+      currentEditingTeam = teamKey;
+      const teamName = teamKey === 'p1' ? '🔴 1Pチーム' : '🔵 2Pチーム';
+      document.getElementById('modal-title').innerText = `${teamName} オーダー＆キャラ設定`;
+
+      const sourceTeam = teamKey === 'p1' ? state.p1Team : state.p2Team;
+      // ディープコピーで編集用作業配列を作成
+      editingTeamTemp = JSON.parse(JSON.stringify(sourceTeam));
+
+      renderModalOrderList();
+      document.getElementById('order-modal').style.display = 'flex';
+    }
+
+    function closeOrderModal() {
+      document.getElementById('order-modal').style.display = 'none';
+    }
+
+    // モーダル内のプレイヤー＆キャラ一覧描画
+    function renderModalOrderList() {
+      const container = document.getElementById('modal-order-list');
+      container.innerHTML = '';
+
+      editingTeamTemp.forEach((player, idx) => {
+        const row = document.createElement('div');
+        row.className = 'order-item';
+        
+        let charOptions = `<option value="">--キャラ選択--</option>`;
+        CHARACTERS.forEach(c => {
+          const selected = player.char === c ? 'selected' : '';
+          charOptions += `<option value="${c}" ${selected}>${c}</option>`;
+        });
+
+        row.innerHTML = `
+          <span style="width: 24px; font-weight: bold;">${idx + 1}.</span>
+          <span style="flex-grow: 1; font-weight: bold;">${escapeHtml(player.name)}</span>
+          <select onchange="updateTempChar(${idx}, this.value)">
+            ${charOptions}
+          </select>
+          <button class="btn btn-xs" onclick="moveTempOrder(${idx}, -1)">▲</button>
+          <button class="btn btn-xs" onclick="moveTempOrder(${idx}, 1)">▼</button>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    function updateTempChar(idx, charName) {
+      editingTeamTemp[idx].char = charName;
+    }
+
+    function moveTempOrder(idx, direction) {
+      const newIdx = idx + direction;
+      if (newIdx < 0 || newIdx >= editingTeamTemp.length) return;
+      const temp = editingTeamTemp[idx];
+      editingTeamTemp[idx] = editingTeamTemp[newIdx];
+      editingTeamTemp[newIdx] = temp;
+      renderModalOrderList();
+    }
+
+    // 選択されたルール（ラジオボタン）に応じて並び替えを実行
+    function runOrderRule() {
+      const mode = document.querySelector('input[name="order-mode"]:checked').value;
+      if (editingTeamTemp.length <= 1) return;
+
+      if (mode === 'shuffle-taisho') {
+        // 大将（最後の人）以外をシャッフル
+        const taisho = editingTeamTemp.pop();
+        for (let i = editingTeamTemp.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [editingTeamTemp[i], editingTeamTemp[j]] = [editingTeamTemp[j], editingTeamTemp[i]];
+        }
+        editingTeamTemp.push(taisho);
+      } else if (mode === 'kabuse') {
+        // 全体をランダムシャッフル
+        for (let i = editingTeamTemp.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [editingTeamTemp[i], editingTeamTemp[j]] = [editingTeamTemp[j], editingTeamTemp[i]];
+        }
+      } else {
+        // 完全自由シャッフル
+        for (let i = editingTeamTemp.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [editingTeamTemp[i], editingTeamTemp[j]] = [editingTeamTemp[j], editingTeamTemp[i]];
+        }
+      }
+      renderModalOrderList();
+    }
+
+    // モーダルの設定内容を確定保存
+    function saveOrderModal() {
+      if (currentEditingTeam === 'p1') {
+        state.p1Team = JSON.parse(JSON.stringify(editingTeamTemp));
+      } else {
+        state.p2Team = JSON.parse(JSON.stringify(editingTeamTemp));
+      }
+      closeOrderModal();
+      renderAll();
     }
 
     // チェックされたプレイヤーを1P/2Pにランダム自動振り分け
@@ -409,19 +612,17 @@
         return;
       }
 
-      // シャッフル (Fisher-Yates)
+      // シャッフル
       for (let i = checkedNames.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [checkedNames[i], checkedNames[j]] = [checkedNames[j], checkedNames[i]];
       }
 
-      // クリア
       state.p1Team = [];
       state.p2Team = [];
       state.p1Bench = [];
       state.p2Bench = [];
 
-      // 交互に1P, 2Pへ割り振る（設定された枠数を超えた分はベンチへ）
       checkedNames.forEach((name, index) => {
         const playerObj = { name: name, char: '' };
         if (index % 2 === 0) {
@@ -442,7 +643,6 @@
       renderAll();
     }
 
-    // 枠数の変化に応じて現在のスロット数を調整する
     function adjustSlotsToMax() {
       while (state.p1Team.length > state.maxSlots) {
         state.p1Bench.push(state.p1Team.pop());
@@ -452,10 +652,8 @@
       }
     }
 
-    // マスタープレイヤータグの描画
     function renderMasterPlayers() {
       const container = document.getElementById('player-tags-container');
-      // チェック状態を保持
       const currentCheckedState = {};
       state.playersMaster.forEach((_, idx) => {
         const chk = document.getElementById(`p-check-${idx}`);
@@ -483,7 +681,6 @@
       renderMasterPlayers();
     }
 
-    // 全体描画
     function renderAll() {
       renderMasterPlayers();
       renderSlots('p1-team-list', state.p1Team, state.maxSlots, '1P');
@@ -492,7 +689,6 @@
       renderBench('p2-bench-list', state.p2Bench);
     }
 
-    // 対戦枠描画
     function renderSlots(containerId, teamArray, maxSlots, teamLabel) {
       const container = document.getElementById(containerId);
       container.innerHTML = '';
@@ -507,7 +703,7 @@
             <div class="slot-idx">${i + 1}</div>
             <div class="card-info">
               <span class="p-name">${escapeHtml(player.name || '未設定')}</span>
-              <span class="c-name">${escapeHtml(player.char || '未設定')}</span>
+              <span class="c-name">${escapeHtml(player.char || 'キャラ未選択')}</span>
             </div>
             <div class="card-btns">
               <button class="btn btn-xs">勝</button>
@@ -527,7 +723,6 @@
       }
     }
 
-    // ベンチ描画
     function renderBench(containerId, benchArray) {
       const container = document.getElementById(containerId);
       container.innerHTML = '';
@@ -547,7 +742,6 @@
       return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-    // 起動
     window.onload = init;
   </script>
 </body>
