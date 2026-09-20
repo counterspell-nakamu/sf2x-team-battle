@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>スパ2X リアルタイム対戦管理ツール</title>
+  <style>
+    :root {
+      --bg-color: #121212;
+      --card-bg: #1e1e1e;
+      --text-color: #ffffff;
+      --accent-color: #ff9800;
+      --p1-color: #2196f3;
+      --p2-color: #f44336;
+      --border-color: #333333;
+    }
+
+    body {
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      margin: 0;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px;
+      background-color: #000;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .room-info {
+      font-weight: bold;
+      color: var(--accent-color);
+    }
+
+    .header-controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    input[type="text"], select {
+      background-color: #222;
+      color: #fff;
+      border: 1px solid var(--border-color);
+      padding: 6px 10px;
+      border-radius: 4px;
+    }
+
+    button {
+      background-color: var(--accent-color);
+      color: #000;
+      border: none;
+      padding: 6px 14px;
+      font-weight: bold;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    button:hover {
+      opacity: 0.8;
+    }
+
+    button.secondary {
+      background-color: #555;
+      color: #fff;
+    }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      position: relative;
+    }
+
+    .card.active {
+      border: 2px solid var(--accent-color);
+    }
+
+    .card-header {
+      font-size: 0.85em;
+      color: #888;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .match-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .side {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px;
+      border-radius: 4px;
+    }
+
+    .side.p1 { background-color: rgba(33, 150, 243, 0.1); }
+    .side.p2 { background-color: rgba(244, 67, 54, 0.1); }
+
+    .side.right {
+      flex-direction: row-reverse;
+      text-align: right;
+    }
+
+    .char-img {
+      width: 48px;
+      height: 48px;
+      object-fit: contain;
+      background-color: #000;
+      border-radius: 4px;
+      border: 1px solid #444;
+    }
+
+    .player-details {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .p-name {
+      font-weight: bold;
+      font-size: 0.9em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .c-name {
+      font-size: 0.75em;
+      color: #aaa;
+    }
+
+    .vs-badge {
+      font-weight: bold;
+      font-style: italic;
+      color: var(--accent-color);
+      font-size: 0.9em;
+    }
+
+    /* モーダルUI */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.8);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal.open {
+      display: flex;
+    }
+
+    .modal-content {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      padding: 20px;
+      border-radius: 8px;
+      max-width: 900px;
+      width: 95%;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 10px;
+    }
+
+    .team-settings {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+    }
+
+    @media (max-width: 600px) {
+      .team-settings { grid-template-columns: 1fr; }
+    }
+
+    .team-box {
+      border: 1px solid var(--border-color);
+      padding: 10px;
+      border-radius: 6px;
+    }
+
+    .team-box.p1-box { border-top: 4px solid var(--p1-color); }
+    .team-box.p2-box { border-top: 4px solid var(--p2-color); }
+
+    .slot-row {
+      display: flex;
+      gap: 5px;
+      margin-bottom: 6px;
+      align-items: center;
+    }
+
+    .slot-num {
+      width: 20px;
+      font-size: 0.8em;
+      color: #888;
+    }
+
+    .bench-area {
+      margin-top: 15px;
+      padding: 10px;
+      background: #111;
+      border-radius: 6px;
+    }
+
+    .bench-title {
+      font-size: 0.85em;
+      color: var(--accent-color);
+      margin-bottom: 5px;
+    }
+
+    .bench-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .bench-chip {
+      background: #222;
+      border: 1px solid #444;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 0.8em;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .config-bar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      background: #151515;
+      padding: 10px;
+      border-radius: 6px;
+      margin-bottom: 15px;
+      flex-wrap: wrap;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="room-info">
+      部屋名: <span id="display-room-name">未接続</span>
+    </div>
+    <div class="header-controls">
+      <input type="text" id="room-input" placeholder="部屋名を入力">
+      <button onclick="changeRoom()">部屋移動</button>
+      <button onclick="openModal()" class="secondary">⚙ オーダー・設定</button>
+    </div>
+  </header>
+
+  <!-- 対戦枠表示メインエリア -->
+  <div class="main-grid" id="match-cards-container"></div>
+
+  <!-- 被せモード用ベンチエリア -->
+  <div class="bench-area" id="bench-container" style="display: none;">
+    <div class="bench-title">ベンチ（控えメンバー）</div>
+    <div class="bench-list" id="bench-list"></div>
+  </div>
+
+  <!-- オーダー設定モーダル -->
+  <div class="modal" id="settings-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>対戦オーダー・ルール設定</h3>
+        <button onclick="closeModal()">✕ 閉じる</button>
+      </div>
+
+      <div class="config-bar">
+        <label>
+          対戦枠数: 
+          <select id="slot-count-select" onchange="updateSlotCountUI()">
+            <option value="6">6人戦 (3vs3)</option>
+            <option value="8">8人戦 (4vs4)</option>
+            <option value="10">10人戦 (5vs5)</option>
+            <option value="12">12人戦 (6vs6)</option>
+            <option value="14">14人戦 (7vs7)</option>
+            <option value="16" selected>16人戦 (8vs8)</option>
+          </select>
+        </label>
+        <label>
+          <input type="checkbox" id="counter-mode-toggle" onchange="toggleCounterMode()"> 1人目先鋒申告＋被せモード
+        </label>
+      </div>
+
+      <div class="team-settings">
+        <!-- P1 チーム -->
+        <div class="team-box p1-box">
+          <h4>1P チーム</h4>
+          <div style="margin-bottom: 10px; display: flex; gap: 5px;">
+            <input type="text" id="p1-players-list" placeholder="プレイヤー名をカンマ区切り入力" style="flex: 1;">
+            <button onclick="autoFillPlayers('p1')" class="secondary">連続配置</button>
+          </div>
+          <div id="p1-slots-inputs"></div>
+          <button onclick="randomizeTeam('p1')" class="secondary" style="width: 100%; margin-top: 8px;">🎲 1P ランダム設定</button>
+        </div>
+
+        <!-- P2 チーム -->
+        <div class="team-box p2-box">
+          <h4>2P チーム</h4>
+          <div style="margin-bottom: 10px; display: flex; gap: 5px;">
+            <input type="text" id="p2-players-list" placeholder="プレイヤー名をカンマ区切り入力" style="flex: 1;">
+            <button onclick="autoFillPlayers('p2')" class="secondary">連続配置</button>
+          </div>
+          <div id="p2-slots-inputs"></div>
+          <button onclick="randomizeTeam('p2')" class="secondary" style="width: 100%; margin-top: 8px;">🎲 2P ランダム設定</button>
+        </div>
+      </div>
+
+      <div style="margin-top: 20px; text-align: right; display: flex; justify-content: space-between;">
+        <button onclick="clearAllData()" class="secondary" style="background-color: #c62828; color: #fff;">全データリセット</button>
+        <button onclick="saveAndCloseModal()">保存して適用</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+
+  <script>
+    // --- 16キャラのデータ定義 ---
+    const CHARACTERS = [
+      { id: "ryu", name: "リュウ" },
+      { id: "ken", name: "ケン" },
+      { id: "e_honda", name: "エドモンド本田" },
+      { id: "chun_li", name: "春麗" },
+      { id: "blanka", name: "ブランカ" },
+      { id: "zangief", name: "ザンギエフ" },
+      { id: "guile", name: "ガイル" },
+      { id: "dhalsim", name: "ダルシム" },
+      { id: "feilong", name: "飛龍（フェイロン）" },
+      { id: "cammy", name: "キャミィ" },
+      { id: "t_hawk", name: "サンダー・ホーク" },
+      { id: "dee_jay", name: "ディージェイ" },
+      { id: "boxer", name: "バイソン" },
+      { id: "m_bison", name: "バルログ" },
+      { id: "sagat", name: "サガット" },
+      { id: "vega", name: "ベガ" }
+    ];
+
+    // --- Firebase 初期化（設定値） ---
+    const firebaseConfig = {
+      databaseURL: "https://sf2x-app-default-rtdb.firebaseio.com/" // ※必要に応じてご自身のURLに変更してください
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // アプリ状態
+    let currentRoom = "default";
+    let maxSlots = 16;
+    let isCounterMode = false;
+    let roomData = {
+      maxSlots: 16,
+      isCounterMode: false,
+      p1: [],
+      p2: []
+    };
+
+    // 初期化ロード
+    window.addEventListener('DOMContentLoaded', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const roomParam = urlParams.get('room');
+      currentRoom = roomParam ? roomParam : 'room1';
+      document.getElementById('display-room-name').innerText = currentRoom;
+      document.getElementById('room-input').value = currentRoom;
+
+      initDataStructure();
+      listenToRoomData();
+    });
+
+    function initDataStructure() {
+      roomData.p1 = Array.from({ length: 8 }, (_, i) => ({ player: `P1_Player_${i+1}`, char: CHARACTERS[i % 16].id }));
+      roomData.p2 = Array.from({ length: 8 }, (_, i) => ({ player: `P2_Player_${i+1}`, char: CHARACTERS[(i+8) % 16].id }));
+    }
+
+    // Firebase リアルタイム同期のリスナー
+    function listenToRoomData() {
+      const roomRef = db.ref('sf2x_rooms/' + currentRoom);
+      roomRef.on('value', (snapshot) => {
+        const val = snapshot.val();
+        if (val) {
+          roomData = val;
+          if (!roomData.p1) roomData.p1 = [];
+          if (!roomData.p2) roomData.p2 = [];
+          maxSlots = roomData.maxSlots || 16;
+          isCounterMode = !!roomData.isCounterMode;
+        } else {
+          // 初期値書き込み
+          roomData.maxSlots = maxSlots;
+          roomData.isCounterMode = isCounterMode;
+          saveToFirebase();
+        }
+        renderUI();
+      });
+    }
+
+    function saveToFirebase() {
+      roomData.maxSlots = maxSlots;
+      roomData.isCounterMode = isCounterMode;
+      db.ref('sf2x_rooms/' + currentRoom).set(roomData);
+    }
+
+    function changeRoom() {
+      const newRoom = document.getElementById('room-input').value.trim();
+      if (newRoom) {
+        window.location.search = `?room=${encodeURIComponent(newRoom)}`;
+      }
+    }
+
+    // UI レンダリング
+    function renderUI() {
+      const container = document.getElementById('match-cards-container');
+      container.innerHTML = '';
+
+      const matchPairs = maxSlots / 2;
+
+      for (let i = 0; i < matchPairs; i++) {
+        const p1Data = roomData.p1[i] || { player: '', char: 'ryu' };
+        const p2Data = roomData.p2[i] || { player: '', char: 'ryu' };
+
+        const card = document.createElement('div');
+        card.className = 'card';
+
+        card.innerHTML = `
+          <div class="card-header">
+            <span>第 ${i + 1} 試合</span>
+          </div>
+          <div class="match-row">
+            <!-- 1P -->
+            <div class="side p1">
+              <img src="image/${p1Data.char}_0.png" class="char-img" onerror="this.src='https://via.placeholder.com/48?text=?';">
+              <div class="player-details">
+                <span class="p-name">${escapeHtml(p1Data.player)}</span>
+                <span class="c-name">${getCharName(p1Data.char)}</span>
+              </div>
+            </div>
+
+            <div class="vs-badge">VS</div>
+
+            <!-- 2P -->
+            <div class="side p2 right">
+              <img src="image/${p2Data.char}_0.png" class="char-img" onerror="this.src='https://via.placeholder.com/48?text=?';">
+              <div class="player-details">
+                <span class="p-name">${escapeHtml(p2Data.player)}</span>
+                <span class="c-name">${getCharName(p2Data.char)}</span>
+              </div>
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
+      }
+
+      // ベンチ表示（被せモードで対戦枠からはみ出た分）
+      const benchContainer = document.getElementById('bench-container');
+      const benchList = document.getElementById('bench-list');
+      benchList.innerHTML = '';
+
+      if (isCounterMode && (roomData.p1.length > matchPairs || roomData.p2.length > matchPairs)) {
+        benchContainer.style.display = 'block';
+
+        // P1 ベンチ
+        for (let i = matchPairs; i < roomData.p1.length; i++) {
+          const item = roomData.p1[i];
+          if (item) {
+            benchList.innerHTML += `<div class="bench-chip" style="border-left: 3px solid var(--p1-color);">[1P] ${escapeHtml(item.player)} (${getCharName(item.char)})</div>`;
+          }
+        }
+        // P2 ベンチ
+        for (let i = matchPairs; i < roomData.p2.length; i++) {
+          const item = roomData.p2[i];
+          if (item) {
+            benchList.innerHTML += `<div class="bench-chip" style="border-left: 3px solid var(--p2-color);">[2P] ${escapeHtml(item.player)} (${getCharName(item.char)})</div>`;
+          }
+        }
+      } else {
+        benchContainer.style.display = 'none';
+      }
+    }
+
+    // --- モーダル制御 ---
+    function openModal() {
+      document.getElementById('slot-count-select').value = maxSlots;
+      document.getElementById('counter-mode-toggle').checked = isCounterMode;
+      updateSlotCountUI();
+      document.getElementById('settings-modal').classList.add('open');
+    }
+
+    function closeModal() {
+      document.getElementById('settings-modal').classList.remove('open');
+    }
+
+    function updateSlotCountUI() {
+      const selectedMax = parseInt(document.getElementById('slot-count-select').value, 10);
+      const teamSlots = selectedMax / 2;
+
+      const p1Container = document.getElementById('p1-slots-inputs');
+      const p2Container = document.getElementById('p2-slots-inputs');
+
+      p1Container.innerHTML = '';
+      p2Container.innerHTML = '';
+
+      for (let i = 0; i < teamSlots; i++) {
+        p1Container.appendChild(createSlotInputRow('p1', i));
+        p2Container.appendChild(createSlotInputRow('p2', i));
+      }
+    }
+
+    function createSlotInputRow(team, index) {
+      const data = (roomData[team] && roomData[team][index]) ? roomData[team][index] : { player: `${team.toUpperCase()}_P${index+1}`, char: 'ryu' };
+
+      const row = document.createElement('div');
+      row.className = 'slot-row';
+
+      let charOptions = CHARACTERS.map(c => 
+        `<option value="${c.id}" ${data.char === c.id ? 'selected' : ''}>${c.name}</option>`
+      ).join('');
+
+      row.innerHTML = `
+        <span class="slot-num">${index + 1}</span>
+        <input type="text" id="${team}-p-name-${index}" value="${escapeHtml(data.player)}" placeholder="名前" style="flex: 1;">
+        <select id="${team}-c-select-${index}">
+          ${charOptions}
+        </select>
+      `;
+      return row;
+    }
+
+    function saveAndCloseModal() {
+      maxSlots = parseInt(document.getElementById('slot-count-select').value, 10);
+      isCounterMode = document.getElementById('counter-mode-toggle').checked;
+
+      const teamSlots = maxSlots / 2;
+      let newP1 = [];
+      let newP2 = [];
+
+      for (let i = 0; i < teamSlots; i++) {
+        const p1Name = document.getElementById(`p1-p-name-${i}`)?.value || `1P_${i+1}`;
+        const p1Char = document.getElementById(`p1-c-select-${i}`)?.value || 'ryu';
+        newP1.push({ player: p1Name, char: p1Char });
+
+        const p2Name = document.getElementById(`p2-p-name-${i}`)?.value || `2P_${i+1}`;
+        const p2Char = document.getElementById(`p2-c-select-${i}`)?.value || 'ryu';
+        newP2.push({ player: p2Name, char: p2Char });
+      }
+
+      roomData.p1 = newP1;
+      roomData.p2 = newP2;
+
+      saveToFirebase();
+      closeModal();
+    }
+
+    // プレイヤー名カンマ区切り連番配置
+    function autoFillPlayers(team) {
+      const inputVal = document.getElementById(`${team}-players-list`).value;
+      if (!inputVal.trim()) return;
+
+      const players = inputVal.split(/[,、\n]/).map(s => s.trim()).filter(s => s.length > 0);
+      const teamSlots = parseInt(document.getElementById('slot-count-select').value, 10) / 2;
+
+      for (let i = 0; i < teamSlots; i++) {
+        const nameInput = document.getElementById(`${team}-p-name-${i}`);
+        if (nameInput) {
+          nameInput.value = players[i % players.length] || `P${i+1}`;
+        }
+      }
+    }
+
+    // ランダム設定
+    function randomizeTeam(team) {
+      const teamSlots = parseInt(document.getElementById('slot-count-select').value, 10) / 2;
+      let shuffledChars = [...CHARACTERS].sort(() => Math.random() - 0.5);
+
+      for (let i = 0; i < teamSlots; i++) {
+        const selectEl = document.getElementById(`${team}-c-select-${i}`);
+        if (selectEl) {
+          selectEl.value = shuffledChars[i % shuffledChars.length].id;
+        }
+      }
+    }
+
+    function clearAllData() {
+      if (confirm("本当にこの部屋のオーダーを初期化しますか？")) {
+        initDataStructure();
+        saveToFirebase();
+        closeModal();
+      }
+    }
+
+    function toggleCounterMode() {
+      isCounterMode = document.getElementById('counter-mode-toggle').checked;
+    }
+
+    // ユーティリティ
+    function getCharName(id) {
+      const charObj = CHARACTERS.find(c => c.id === id);
+      return charObj ? charObj.name : id;
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+  </script>
+</body>
+</html>
