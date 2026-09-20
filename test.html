@@ -1,748 +1,977 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>スパ2X チーム管理 & OBSツール</title>
-  <style>
-    :root {
-      --bg-color: #0f1117;
-      --panel-bg: #1a1d24;
-      --card-bg: #222631;
-      --text-main: #f0f2f5;
-      --text-sub: #a0a5b5;
-      --border-color: #313644;
-      --p1-color: #e63946;
-      --p1-bg: rgba(230, 57, 70, 0.15);
-      --p2-color: #457b9d;
-      --p2-bg: rgba(69, 123, 157, 0.15);
-      --win-color: #ffb703;
-      --accent: #2a9d8f;
-    }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>スパ2X キャラ戦 チーム管理＆OBSツール</title>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+<!-- HTML5 Drag and Drop サポート用ライブラリ (SortableJS) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+<style>
+  :root {
+    --bg-color: #0f0f13;
+    --panel-bg: #1a1a24;
+    --card-bg: #252533;
+    --text-color: #ffffff;
+    --1p-color: #8d0801;
+    --2p-color: #1d3557;
+  }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    margin: 0;
+    padding: 10px;
+  }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background-color: var(--bg-color);
-      color: var(--text-main);
-      padding: 12px;
-      font-size: 13px;
-    }
+  h2, h3 { margin: 5px 0 10px 0; }
 
-    /* 上部操作パネル */
-    .top-panel {
-      background-color: var(--panel-bg);
-      border: 1px solid var(--border-color);
-      border-radius: 6px;
-      padding: 10px;
-      margin-bottom: 12px;
-    }
+  .admin-panel {
+    background: var(--panel-bg);
+    border: 1px solid #333;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    overflow: hidden;
+  }
 
-    .panel-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 8px;
-      cursor: pointer;
-      user-select: none;
-    }
+  /* ヘッダー全体の横並びレイアウト設定 */
+  .admin-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: #20202d;
+    cursor: pointer;
+    user-select: none;
+    font-weight: bold;
+    font-size: 1.1em;
+  }
+  .admin-summary:hover {
+    background: #282838;
+  }
 
-    .panel-title { font-weight: bold; font-size: 14px; }
+  .admin-body {
+    padding: 12px;
+  }
 
-    .room-info {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 12px;
-    }
+  /* ヘッダー右側のルーム操作エリア */
+  .room-header-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85em;
+    font-weight: normal;
+  }
 
-    .room-input {
-      background: #111;
-      border: 1px solid var(--border-color);
-      color: #fff;
-      padding: 2px 6px;
-      border-radius: 3px;
-      width: 100px;
-    }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
 
-    .btn {
-      background: #2c313e;
-      color: #fff;
-      border: 1px solid var(--border-color);
-      padding: 4px 10px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 12px;
-      transition: background 0.2s;
-    }
+  textarea, select, input[type="text"] {
+    background: #101015;
+    color: #fff;
+    border: 1px solid #444;
+    padding: 6px;
+    border-radius: 4px;
+    box-sizing: border-box;
+  }
 
-    .btn:hover { background: #3a4152; }
-    .btn-orange { background: #e76f51; }
-    .btn-orange:hover { background: #f4a261; }
-    .btn-green { background: #2a9d8f; }
-    .btn-green:hover { background: #2ec4b6; }
+  .btn {
+    background: #3a86ff;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  .btn:hover { background: #2563eb; }
+  .btn-danger { background: #d90429; }
+  .btn-success { background: #38b000; }
+  .btn-warning { background: #ff9f1c; color: #000; }
+  .btn-purple { background: #8338ec; color: #fff; }
+  .btn-purple:hover { background: #6c11d9; }
 
-    /* 設定エリア */
-    .controls-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      margin-top: 8px;
-    }
+  .btn-arrow {
+    background: #333348;
+    color: #fff;
+    border: 1px solid #555;
+    border-radius: 3px;
+    padding: 2px 6px;
+    font-size: 0.8em;
+    cursor: pointer;
+  }
+  .btn-arrow:hover { background: #444466; }
 
-    .section-box {
-      background: #14171f;
-      padding: 8px;
-      border-radius: 4px;
-      border: 1px solid #252a36;
-    }
+  .mode-select {
+    background: #111118;
+    padding: 8px;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    font-size: 0.9em;
+  }
 
-    .section-title {
-      font-weight: bold;
-      margin-bottom: 6px;
-      color: var(--text-sub);
-    }
+  .member-checklist {
+    background: #101015;
+    border: 1px solid #444;
+    border-radius: 4px;
+    padding: 8px;
+    max-height: 140px;
+    overflow-y: auto;
+    margin-bottom: 8px;
+  }
 
-    .radio-group {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      margin-bottom: 6px;
-    }
+  .member-item {
+    display: inline-flex;
+    align-items: center;
+    background: #20202c;
+    border: 1px solid #333;
+    padding: 3px 8px;
+    border-radius: 4px;
+    margin-right: 6px;
+    margin-bottom: 6px;
+  }
 
-    .radio-label {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      cursor: pointer;
-    }
+  .btn-del {
+    background: transparent;
+    color: #ff5555;
+    border: none;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 1.1em;
+    padding: 0 2px;
+  }
 
-    .player-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px;
-      margin-bottom: 6px;
-    }
+  /* 4列メインレイアウト */
+  .obs-display {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr 1.2fr 1fr;
+    gap: 10px;
+  }
 
-    .player-tag {
-      background: #2a2e3d;
-      padding: 2px 8px;
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
+  .team-column {
+    background: var(--panel-bg);
+    border-radius: 8px;
+    padding: 8px;
+    box-sizing: border-box;
+    min-height: 400px;
+  }
 
-    .tag-remove {
-      cursor: pointer;
-      color: #ff6b6b;
-      font-weight: bold;
-    }
+  .team-title {
+    text-align: center;
+    font-size: 1em;
+    font-weight: bold;
+    padding: 4px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+  }
+  .p1-header { background: var(--1p-color); }
+  .p2-header { background: var(--2p-color); }
+  .bench-header { background: #333; color: #aaa; }
 
-    .add-player-form {
-      display: flex;
-      gap: 4px;
-      margin-bottom: 8px;
-    }
+  .player-card {
+    display: flex;
+    align-items: center;
+    background: var(--card-bg);
+    margin-bottom: 4px;
+    padding: 4px 6px;
+    border-radius: 4px;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+    width: 100%;
+    box-sizing: border-box;
+    height: 42px;
+    transition: transform 0.1s, background 0.1s;
+  }
+  .player-card:hover { background: #323246; transform: scale(1.01); }
 
-    .text-input {
-      background: #111;
-      border: 1px solid var(--border-color);
-      color: #fff;
-      padding: 4px 8px;
-      border-radius: 4px;
-      flex-grow: 1;
-    }
+  .order-num { font-weight: bold; width: 20px; color: #aaa; text-align: right; font-size: 0.9em; flex-shrink: 0; }
+  
+  .char-face { 
+    width: 32px; 
+    height: 32px; 
+    object-fit: cover; 
+    border-radius: 3px; 
+    background: #000; 
+    flex-shrink: 0;
+  }
+  .p2-face {
+    transform: scaleX(-1);
+  }
+  .char-face.load-error { display: none; }
 
-    .select-input {
-      background: #111;
-      border: 1px solid var(--border-color);
-      color: #fff;
-      padding: 4px 8px;
-      border-radius: 4px;
-      margin-bottom: 6px;
-    }
+  .player-info { flex: 1; overflow: hidden; min-width: 0; }
+  .player-name { 
+    font-size: 0.9em; 
+    font-weight: bold; 
+    white-space: nowrap; 
+    overflow: hidden; 
+    text-overflow: ellipsis; 
+  }
+  .char-name { font-size: 0.7em; color: #bbb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    /* メインレイアウト */
-    .main-grid {
-      display: grid;
-      grid-template-columns: 1fr 2fr 2fr 1fr;
-      gap: 10px;
-    }
+  .is-hidden .player-name { color: #666; }
+  .is-hidden .char-name { color: #444; }
 
-    .column {
-      background: var(--panel-bg);
-      border: 1px solid var(--border-color);
-      border-radius: 6px;
-      padding: 8px;
-      display: flex;
-      flex-direction: column;
-    }
+  /* モーダル＆ドラッグ行スタイル */
+  .modal {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.8);
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+  }
+  .modal-content {
+    background: var(--panel-bg);
+    padding: 20px;
+    border-radius: 8px;
+    max-width: 850px;
+    width: 95%;
+    max-height: 85vh;
+    overflow-y: auto;
+  }
 
-    .col-header {
-      text-align: center;
-      font-weight: bold;
-      padding: 6px;
-      margin-bottom: 8px;
-      border-radius: 4px;
-      background: #14171f;
-    }
+  .order-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 6px;
+    background: #20202d;
+    padding: 6px;
+    border-radius: 4px;
+    border: 1px solid #333;
+  }
 
-    .p1-header { color: var(--p1-color); background: var(--p1-bg); }
-    .p2-header { color: var(--p2-color); background: var(--p2-bg); }
+  .drag-handle {
+    cursor: grab;
+    color: #888;
+    font-size: 1.2em;
+    padding: 0 4px;
+    user-select: none;
+  }
+  .drag-handle:active { cursor: grabbing; }
 
-    .slot-container {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      flex-grow: 1;
-      min-height: 200px;
-    }
+  .arrow-group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
 
-    .card {
-      background: var(--card-bg);
-      border: 1px solid var(--border-color);
-      border-radius: 4px;
-      padding: 6px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      cursor: grab;
-    }
+  /* キャラ選択ボタン＆ポップアップUI */
+  .char-picker-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #101015;
+    border: 1px solid #444;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    min-width: 140px;
+  }
+  .char-picker-btn:hover { background: #2a2a38; }
 
-    .card.bench-card {
-      cursor: default;
-    }
-
-    .slot-idx {
-      width: 18px;
-      text-align: center;
-      font-weight: bold;
-      color: var(--text-sub);
-    }
-
-    .card-info {
-      flex-grow: 1;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .p-name { font-weight: bold; }
-    .c-name { font-size: 11px; color: var(--text-sub); }
-
-    .card-btns {
-      display: flex;
-      gap: 2px;
-    }
-
-    .btn-xs {
-      padding: 2px 4px;
-      font-size: 10px;
-      border-radius: 2px;
-    }
-
-    /* モーダル表示 */
-    .modal-overlay {
-      display: none;
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0, 0, 0, 0.7);
-      z-index: 1000;
-      justify-content: center;
-      align-items: center;
-    }
-
-    .modal-content {
-      background: var(--panel-bg);
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      width: 90%;
-      max-width: 500px;
-      max-height: 85vh;
-      display: flex;
-      flex-direction: column;
-      padding: 16px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-    }
-
-    .modal-header {
-      font-size: 16px;
-      font-weight: bold;
-      margin-bottom: 12px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .modal-body {
-      overflow-y: auto;
-      flex-grow: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      padding-right: 4px;
-    }
-
-    .order-item {
-      background: var(--card-bg);
-      padding: 6px 10px;
-      border-radius: 4px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      border: 1px solid var(--border-color);
-    }
-
-    .order-item select {
-      background: #111;
-      color: #fff;
-      border: 1px solid var(--border-color);
-      padding: 2px 4px;
-      border-radius: 3px;
-    }
-
-    .modal-footer {
-      margin-top: 12px;
-      display: flex;
-      justify-content: flex-end;
-      gap: 8px;
-    }
-  </style>
+  .char-palette {
+    display: none;
+    position: absolute;
+    background: #15151f;
+    border: 2px solid #3a86ff;
+    border-radius: 8px;
+    padding: 8px;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 6px;
+    z-index: 200;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.8);
+  }
+  .char-palette-item {
+    cursor: pointer;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    padding: 2px;
+    text-align: center;
+  }
+  .char-palette-item:hover {
+    border-color: #ff9f1c;
+    background: #333348;
+  }
+  .char-palette-item img {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+    display: block;
+    border-radius: 3px;
+  }
+</style>
 </head>
 <body>
 
-  <!-- 管理操作パネル -->
-  <div class="top-panel">
-    <div class="panel-header" id="toggle-panel">
-      <span class="panel-title">▼ ⚙️ 管理操作パネル</span>
-      <div class="room-info" onclick="event.stopPropagation();">
-        🏠 現在のルーム: <strong id="room-display">default</strong>
-        <input type="text" id="room-input" class="room-input" value="default">
-        <button id="btn-change-room" class="btn btn-orange">部屋移動</button>
+  <div class="admin-panel">
+    <details open>
+      <summary class="admin-summary">
+        <span>▼ ⚙️ 管理操作パネル</span>
+
+        <!-- 一番右上（ヘッダー内）へ移動したルーム表示＆切り替え機能 -->
+        <div class="room-header-controls" onclick="event.stopPropagation();">
+          <span>🏠 現在のルーム: <strong id="currentRoomDisplay" style="color:#ff9f1c; font-size:1.1em;">default</strong></span>
+          <input type="text" id="roomInput" placeholder="部屋名" style="width:140px; padding:3px 6px;">
+          <button class="btn btn-warning" style="padding:4px 10px;" onclick="changeRoom()">部屋移動</button>
+        </div>
+      </summary>
+
+      <div class="admin-body">
+        <div class="mode-select" style="background:#20202d; margin-bottom:12px;">
+          <b>📱 端末別入力モード設定:</b><br>
+          <label><input type="radio" name="deviceRole" value="pc_all" checked onclick="setDeviceRole('pc_all')"> 💻 PC1台で両チーム分を入力する</label><br>
+          <label><input type="radio" name="deviceRole" value="p1_only" onclick="setDeviceRole('p1_only')"> 🔴 この端末は 1Pチームのみ 操作＆閲覧</label><br>
+          <label><input type="radio" name="deviceRole" value="p2_only" onclick="setDeviceRole('p2_only')"> 🔵 この端末は 2Pチームのみ 操作＆閲覧</label>
+        </div>
+
+        <div class="grid-2">
+          <div>
+            <h3>1. プレイヤー選択（本日の参加者）</h3>
+            <div id="masterChecklist" class="member-checklist"></div>
+            
+            <div style="display:flex; gap:5px; margin-bottom:10px;">
+              <input type="text" id="newPlayerInput" placeholder="新しいプレイヤー名を追加" style="flex:1;">
+              <button class="btn" onclick="addNewPlayer()">名簿に追加</button>
+            </div>
+
+            <button class="btn btn-success" style="width:100%;" onclick="makeRandomTeams()">チェックした人を1P / 2Pチームに自動振り分け</button>
+          </div>
+
+          <div>
+            <h3>2. オーダー＆キャラ設定</h3>
+            <!-- 対戦枠数（キャラ数）選択機能の追加 -->
+            <div style="margin-bottom:8px; display:flex; align-items:center; gap:8px; background:#111118; padding:6px 8px; border-radius:6px;">
+              <label for="slotCountSelect" style="font-weight:bold; font-size:0.9em;">🎯 対戦枠数 (キャラ数):</label>
+              <select id="slotCountSelect" onchange="changeSlotCount(this.value)" style="padding:3px 6px;">
+                <option value="5">5枠 (5キャラ戦)</option>
+                <option value="7">7枠 (7キャラ戦)</option>
+                <option value="10">10枠 (10キャラ戦)</option>
+                <option value="12">12枠 (12キャラ戦)</option>
+                <option value="15">15枠 (15キャラ戦)</option>
+                <option value="16" selected>16枠 (16キャラ戦)</option>
+              </select>
+            </div>
+
+            <div class="mode-select">
+              <label><input type="radio" name="orderMode" value="manual" checked onclick="updateModalLabels()"> 手動設定（完全自由）</label><br>
+              <label><input type="radio" name="orderMode" value="bossFixed" onclick="updateModalLabels()"> <span id="labelBossFixed">1〜15人目シャッフル ＋ 大将(16人目)固定</span></label><br>
+              <label><input type="radio" name="orderMode" value="counterPick" onclick="updateModalLabels()"> <span id="labelCounterPick">先鋒申告 ＋ 2〜16人目被せ</span></label>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+              <button id="btnOpenP1" class="btn btn-success" onclick="openOrderModal('1')">🔴 1Pチーム オーダー設定</button>
+              <button id="btnOpenP2" class="btn btn-success" onclick="openOrderModal('2')">🔵 2Pチーム オーダー設定</button>
+            </div>
+          </div>
+        </div>
+
       </div>
+    </details>
+  </div>
+
+  <!-- 4列レイアウト -->
+  <div class="obs-display">
+    <div class="team-column">
+      <div class="team-title bench-header">1P 待機 (ベンチ)</div>
+      <div id="team1-bench-display"></div>
     </div>
 
-    <div class="controls-grid" id="panel-content">
-      <!-- 1. プレイヤー選択 & 枠数設定 -->
-      <div class="section-box">
-        <div class="section-title">1. プレイヤー選択 & 枠数設定</div>
-        
-        <div style="margin-bottom: 8px;">
-          <label style="font-size: 12px; color: var(--text-sub);">対戦枠数 (片側): </label>
-          <select id="select-max-slots" class="select-input">
-            <option value="4">4枠 (計8名)</option>
-            <option value="6">6枠 (計12名)</option>
-            <option value="8">8枠 (計16名)</option>
-            <option value="10">10枠 (計20名)</option>
-            <option value="12">12枠 (計24名)</option>
-            <option value="14">14枠 (計28名)</option>
-            <option value="16" selected>16枠 (計32名)</option>
-          </select>
-        </div>
+    <div class="team-column">
+      <div class="team-title p1-header">1P TEAM (対戦枠)</div>
+      <div id="team1-match-display"></div>
+    </div>
 
-        <div class="radio-group">
-          <label class="radio-label"><input type="radio" name="input-mode" value="both" checked> 💻 PC1台で両チーム分を入力する</label>
-          <label class="radio-label"><input type="radio" name="input-mode" value="p1"> 🔴 この端末は 1Pチームのみ 操作&閲覧</label>
-          <label class="radio-label"><input type="radio" name="input-mode" value="p2"> 🔵 この端末は 2Pチームのみ 操作&閲覧</label>
-        </div>
+    <div class="team-column">
+      <div class="team-title p2-header">2P TEAM (対戦枠)</div>
+      <div id="team2-match-display"></div>
+    </div>
 
-        <div class="player-tags" id="player-tags-container"></div>
-
-        <div class="add-player-form">
-          <input type="text" id="new-player-name" class="text-input" placeholder="新しいプレイヤー名を追加">
-          <button id="btn-add-player" class="btn">名簿に追加</button>
-        </div>
-
-        <button id="btn-auto-assign" class="btn btn-green" style="width: 100%;">チェックした人を1P / 2Pチームに自動振り分け</button>
-      </div>
-
-      <!-- 2. オーダー & キャラ設定 -->
-      <div class="section-box">
-        <div class="section-title">2. オーダー＆キャラ設定</div>
-        
-        <div class="radio-group">
-          <label class="radio-label"><input type="radio" name="order-mode" value="manual" checked> 手動設定（完全自由）</label>
-          <label class="radio-label"><input type="radio" name="order-mode" value="shuffle-taisho"> 1〜(N-1)人目シャッフル ＋ 大将固定</label>
-          <label class="radio-label"><input type="radio" name="order-mode" value="kabuse"> 先鋒申告 ＋ 2〜N人目被せ</label>
-        </div>
-
-        <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 12px;">
-          <button id="btn-order-p1" class="btn btn-green" style="background: var(--p1-color);">🔴 1Pチーム オーダー設定</button>
-          <button id="btn-order-p2" class="btn btn-green" style="background: var(--p2-color);">🔵 2Pチーム オーダー設定</button>
-        </div>
-      </div>
+    <div class="team-column">
+      <div class="team-title bench-header">2P 待機 (ベンチ)</div>
+      <div id="team2-bench-display"></div>
     </div>
   </div>
 
-  <!-- メインエリア -->
-  <div class="main-grid">
-    <!-- 1P 待機 (ベンチ) -->
-    <div class="column">
-      <div class="col-header">1P 待機 (ベンチ)</div>
-      <div class="slot-container" id="p1-bench-list"></div>
-    </div>
-
-    <!-- 1P TEAM (対戦枠) -->
-    <div class="column">
-      <div class="col-header p1-header">1P TEAM (対戦枠)</div>
-      <div class="slot-container" id="p1-team-list"></div>
-    </div>
-
-    <!-- 2P TEAM (対戦枠) -->
-    <div class="column">
-      <div class="col-header p2-header">2P TEAM (対戦枠)</div>
-      <div class="slot-container" id="p2-team-list"></div>
-    </div>
-
-    <!-- 2P 待機 (ベンチ) -->
-    <div class="column">
-      <div class="col-header">2P 待機 (ベンチ)</div>
-      <div class="slot-container" id="p2-bench-list"></div>
-    </div>
-  </div>
-
-  <!-- オーダー設定モーダルダイアログ -->
-  <div class="modal-overlay" id="order-modal">
+  <!-- オーダー設定モーダル -->
+  <div id="orderModal" class="modal">
     <div class="modal-content">
-      <div class="modal-header">
-        <span id="modal-title">🔴 1Pチーム オーダー設定</span>
-        <button class="btn btn-xs" onclick="closeOrderModal()">✕</button>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+        <h3 id="modalTitle" style="margin:0;">オーダー設定</h3>
+        <div style="display:flex; gap:6px;">
+          <button class="btn" style="background:#4a5568;" onclick="autoFillGroupedPlayers()">👥 プレイヤー連続初期配置</button>
+          <button class="btn btn-purple" onclick="fillFullRandomModal()">🎲 完全全ランダム設定</button>
+        </div>
       </div>
-      <div style="margin-bottom: 8px;">
-        <button id="btn-modal-shuffle" class="btn btn-orange" style="width: 100%;">🔀 現在のルールで並び替え実行</button>
-      </div>
-      <div class="modal-body" id="modal-order-list"></div>
-      <div class="modal-footer">
-        <button class="btn" onclick="closeOrderModal()">キャンセル</button>
-        <button id="btn-save-order" class="btn btn-green">確定・保存</button>
+      <div id="modalOrderRows"></div>
+      <br>
+      <div style="display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap;">
+        <button class="btn btn-success" onclick="saveOrderModal()">設定完了</button>
+        <button class="btn btn-danger" onclick="closeOrderModal()">キャンセル</button>
       </div>
     </div>
   </div>
 
-  <script>
-    // スパ2X 16キャラクター定義
-    const CHARACTERS = [
-      'リュウ', 'ケン', 'チュンリー', 'ガイル', 'ブランカ', 'ザンギエフ', 'ダルシム', 'エドモンド本田',
-      'バイソン', 'バルログ', 'サガット', 'ベガ', 'キャミィ', 'ディージェイ', 'サンダーホーク', 'フェイロン'
-    ];
+  <!-- キャラ選択 8x2 パレット (ポップアップ用) -->
+  <div id="charPalette" class="char-palette"></div>
 
-    // --- アプリケーション状態管理 ---
-    let state = {
-      maxSlots: 16,
-      room: 'default',
-      playersMaster: ['サコー', 'ナカム〜', 'ぐっち', 'こたか', 'サシシ'],
-      p1Team: [],
-      p2Team: [],
-      p1Bench: [],
-      p2Bench: []
-    };
+<script>
+// --- Firebase初期設定 ---
+const firebaseConfig = {
+  apiKey: "AIzaSyDMgiXpRGBLJofwxWEh0pG5b3FQ7yZNLK8",
+  authDomain: "sf2x-app.firebaseapp.com",
+  projectId: "sf2x-app",
+  storageBucket: "sf2x-app.firebasestorage.app",
+  messagingSenderId: "447610198262",
+  appId: "1:447610198262:web:1a9576f2d6696518caf4d7",
+  measurementId: "G-141DL20YTK"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
 
-    let currentEditingTeam = 'p1'; // 'p1' or 'p2'
-    let editingTeamTemp = []; // モーダル編集用の作業配列
+// --- ルーム（部屋）機能の追加 ---
+const urlParams = new URLSearchParams(window.location.search);
+let currentRoom = urlParams.get('room') || 'default';
 
-    // 初期化関数
-    function init() {
-      setupEventListeners();
-      renderAll();
+const baseChars = ["リュウ","ケン","本田","春麗","ブランカ","ザンギエフ","ガイル","ダルシム","ホーク","キャミィ","フェイロン","ディージェイ","バイソン","バルログ","サガット","ベガ"];
+const allCharacters = baseChars.map((name, i) => ({
+  id: `x_${i}`, name: `X ${name}`, icon: `image/x_${i}.png`
+}));
+
+let appState = {
+  masterPlayers: ["ウメハラ", "ヌキ", "ハイタニ", "サコー", "ナカム～", "ぐっち", "こたか", "サシシ"],
+  team1Members: [],
+  team2Members: [],
+  team1Orders: { match: [], bench: [] },
+  team2Orders: { match: [], bench: [] },
+  slotCount: 16,
+  isOrderSet: false
+};
+
+let currentRole = 'pc_all';
+let currentModalTeam = '1';
+let sortableInstance = null;
+let activeCharTargetInput = null;
+
+window.onload = function() {
+  initCharPalette();
+  
+  // ルーム名表示更新
+  document.getElementById("currentRoomDisplay").textContent = currentRoom;
+  document.getElementById("roomInput").value = currentRoom;
+
+  // ルームごとのデータベースパスを監視 (`sf2x_rooms/部屋名`)
+  db.ref(`sf2x_rooms/${currentRoom}`).on('value', (snapshot) => {
+    const data = snapshot.val();
+    if (data) {
+      appState = data;
+      if (!appState.slotCount) appState.slotCount = 16;
+      if (Array.isArray(appState.team1Orders)) {
+        appState.team1Orders = { match: appState.team1Orders, bench: [] };
+      }
+      if (Array.isArray(appState.team2Orders)) {
+        appState.team2Orders = { match: appState.team2Orders, bench: [] };
+      }
+      document.getElementById("slotCountSelect").value = appState.slotCount;
+      updateRuleOptionLabels();
+      renderMasterChecklist();
+      renderDisplay();
+    } else {
+      syncToFirebase();
     }
+  });
 
-    // イベントリスナー設定
-    function setupEventListeners() {
-      // パネル折りたたみ
-      document.getElementById('toggle-panel').addEventListener('click', () => {
-        const content = document.getElementById('panel-content');
-        content.style.display = content.style.display === 'none' ? 'grid' : 'none';
-      });
+  document.addEventListener('click', (e) => {
+    const palette = document.getElementById('charPalette');
+    if (!e.target.closest('.char-picker-btn') && !e.target.closest('#charPalette')) {
+      palette.style.display = 'none';
+    }
+  });
+};
 
-      // 枠数変更
-      document.getElementById('select-max-slots').addEventListener('change', (e) => {
-        state.maxSlots = parseInt(e.target.value, 10);
-        adjustSlotsToMax();
-        renderAll();
-      });
+function syncToFirebase() {
+  db.ref(`sf2x_rooms/${currentRoom}`).set(appState);
+}
 
-      // プレイヤー追加
-      document.getElementById('btn-add-player').addEventListener('click', () => {
-        const input = document.getElementById('new-player-name');
-        const name = input.value.trim();
-        if (name && !state.playersMaster.includes(name)) {
-          state.playersMaster.push(name);
-          input.value = '';
-          renderMasterPlayers();
-        }
-      });
+function changeRoom() {
+  const newRoom = document.getElementById("roomInput").value.trim();
+  if (!newRoom) return;
+  window.location.href = `${window.location.pathname}?room=${encodeURIComponent(newRoom)}`;
+}
 
-      // 自動振り分けボタン
-      document.getElementById('btn-auto-assign').addEventListener('click', () => {
-        autoAssignCheckedPlayers();
-      });
+function changeSlotCount(count) {
+  appState.slotCount = parseInt(count, 10);
+  updateRuleOptionLabels();
+  syncToFirebase();
+}
 
-      // オーダー設定ボタン (1P / 2P)
-      document.getElementById('btn-order-p1').addEventListener('click', () => openOrderModal('p1'));
-      document.getElementById('btn-order-p2').addEventListener('click', () => openOrderModal('p2'));
+function updateRuleOptionLabels() {
+  const cnt = appState.slotCount || 16;
+  const labelBoss = document.getElementById("labelBossFixed");
+  const labelCounter = document.getElementById("labelCounterPick");
+  if (labelBoss) labelBoss.textContent = `1〜${cnt - 1}人目シャッフル ＋ 大将(${cnt}人目)固定`;
+  if (labelCounter) labelCounter.textContent = `先鋒申告 ＋ 2〜${cnt}人目被せ`;
+}
 
-      // モーダル内シャッフル実行
-      document.getElementById('btn-modal-shuffle').addEventListener('click', () => runOrderRule());
+function initCharPalette() {
+  const palette = document.getElementById('charPalette');
+  palette.innerHTML = '';
+  allCharacters.forEach(c => {
+    const item = document.createElement('div');
+    item.className = 'char-palette-item';
+    item.title = c.name;
+    item.innerHTML = `<img src="${c.icon}" onerror="this.src=''"><span style="font-size:0.65em;">${c.name.replace('X ','')}</span>`;
+    item.onclick = () => selectCharFromPalette(c.id);
+    palette.appendChild(item);
+  });
+}
 
-      // オーダー確定保存
-      document.getElementById('btn-save-order').addEventListener('click', () => saveOrderModal());
+function openCharPalette(e, hiddenInputId) {
+  e.stopPropagation();
+  activeCharTargetInput = document.getElementById(hiddenInputId);
+  const btn = e.currentTarget;
+  const palette = document.getElementById('charPalette');
+  
+  const rect = btn.getBoundingClientRect();
+  palette.style.top = `${rect.bottom + window.scrollY + 4}px`;
+  palette.style.left = `${Math.min(rect.left + window.scrollX, window.innerWidth - 360)}px`;
+  palette.style.display = 'grid';
+}
 
-      // 部屋移動ボタン
-      document.getElementById('btn-change-room').addEventListener('click', () => {
-        const roomVal = document.getElementById('room-input').value.trim();
-        if (roomVal) {
-          state.room = roomVal;
-          document.getElementById('room-display').innerText = roomVal;
-        }
+function selectCharFromPalette(charId) {
+  if (!activeCharTargetInput) return;
+  activeCharTargetInput.value = charId;
+  
+  const charInfo = allCharacters.find(c => c.id === charId);
+  const btn = activeCharTargetInput.nextElementSibling;
+  btn.querySelector('img').src = charInfo ? charInfo.icon : '';
+  btn.querySelector('span').textContent = charInfo ? charInfo.name : '選択...';
+
+  document.getElementById('charPalette').style.display = 'none';
+}
+
+function setDeviceRole(role) {
+  currentRole = role;
+  const btnP1 = document.getElementById("btnOpenP1");
+  const btnP2 = document.getElementById("btnOpenP2");
+
+  if (role === 'p1_only') {
+    btnP1.style.display = "block";
+    btnP2.style.display = "none";
+  } else if (role === 'p2_only') {
+    btnP1.style.display = "none";
+    btnP2.style.display = "block";
+  } else {
+    btnP1.style.display = "block";
+    btnP2.style.display = "block";
+  }
+  renderDisplay();
+}
+
+function createOrdersEmpty() {
+  let orders = [];
+  const cnt = appState.slotCount || 16;
+  for (let i = 0; i < cnt; i++) {
+    orders.push({ name: "", charId: "", revealed: false });
+  }
+  return { match: orders, bench: [] };
+}
+
+function renderMasterChecklist() {
+  const container = document.getElementById("masterChecklist");
+  if (!container) return;
+  container.innerHTML = "";
+  if (!appState.masterPlayers) appState.masterPlayers = [];
+  
+  appState.masterPlayers.forEach((p, idx) => {
+    const item = document.createElement("div");
+    item.className = "member-item";
+    item.innerHTML = `
+      <label><input type="checkbox" class="player-chk" value="${escapeHTML(p)}" checked> ${escapeHTML(p)}</label>
+      <button class="btn-del" onclick="deletePlayer(${idx})">×</button>
+    `;
+    container.appendChild(item);
+  });
+}
+
+function addNewPlayer() {
+  const input = document.getElementById("newPlayerInput");
+  const name = input.value.trim();
+  if (!name) return;
+  if (!appState.masterPlayers.includes(name)) {
+    appState.masterPlayers.push(name);
+    syncToFirebase();
+  }
+  input.value = "";
+}
+
+function deletePlayer(index) {
+  appState.masterPlayers.splice(index, 1);
+  syncToFirebase();
+}
+
+function makeRandomTeams() {
+  const checkboxes = document.querySelectorAll(".player-chk:checked");
+  const selectedPlayers = Array.from(checkboxes).map(cb => cb.value);
+  if (selectedPlayers.length < 2) {
+    alert("2名以上チェックしてください。");
+    return;
+  }
+
+  let shuffled = [...selectedPlayers].sort(() => Math.random() - 0.5);
+  const half = Math.ceil(shuffled.length / 2);
+  
+  appState.team1Members = shuffled.slice(0, half);
+  appState.team2Members = shuffled.slice(half);
+  appState.team1Orders = createOrdersEmpty();
+  appState.team2Orders = createOrdersEmpty();
+  appState.isOrderSet = false;
+
+  syncToFirebase();
+}
+
+function openOrderModal(teamKey) {
+  if (currentRole === 'p1_only' && teamKey === '2') return;
+  if (currentRole === 'p2_only' && teamKey === '1') return;
+
+  currentModalTeam = teamKey;
+  const members = (teamKey === '1') ? appState.team1Members : appState.team2Members;
+  const ordersObj = (teamKey === '1') ? appState.team1Orders : appState.team2Orders;
+  const slotCount = appState.slotCount || 16;
+  
+  if (!members || members.length === 0) {
+    alert("先にチーム分けを行ってください。");
+    return;
+  }
+
+  let currentSlots = [...(ordersObj.match || []), ...(ordersObj.bench || [])];
+  while (currentSlots.length < slotCount) {
+    currentSlots.push({ name: "", charId: "", revealed: false });
+  }
+  if (currentSlots.length > slotCount) {
+    currentSlots = currentSlots.slice(0, slotCount);
+  }
+
+  const hasAnyName = currentSlots.some(slot => slot.name !== "");
+  if (!hasAnyName) {
+    const grouped = generateGroupedPlayerList(members);
+    currentSlots.forEach((slot, i) => { slot.name = grouped[i] || ""; });
+  }
+
+  document.getElementById("modalTitle").textContent = `${teamKey === '1' ? '🔴 1Pチーム' : '🔵 2Pチーム'} オーダー設定 (${slotCount}枠)`;
+  renderModalRows(members, currentSlots);
+  updateModalLabels();
+  document.getElementById("orderModal").style.display = "flex";
+
+  const el = document.getElementById('modalOrderRows');
+  if (sortableInstance) sortableInstance.destroy();
+  sortableInstance = new Sortable(el, {
+    handle: '.drag-handle',
+    animation: 150,
+    onEnd: function() {
+      updateModalLabels();
+    }
+  });
+}
+
+function generateGroupedPlayerList(members) {
+  const slotCount = appState.slotCount || 16;
+  const mCount = members.length;
+  if (mCount === 0) return Array(slotCount).fill("");
+
+  const baseCount = Math.floor(slotCount / mCount);
+  const remainder = slotCount % mCount;
+
+  let result = [];
+  members.forEach((m, idx) => {
+    const count = baseCount + (idx < remainder ? 1 : 0);
+    for (let i = 0; i < count; i++) {
+      result.push(m);
+    }
+  });
+  return result;
+}
+
+function autoFillGroupedPlayers() {
+  const members = (currentModalTeam === '1') ? appState.team1Members : appState.team2Members;
+  if (!members || members.length === 0) return;
+
+  const grouped = generateGroupedPlayerList(members);
+  const rows = document.querySelectorAll("#modalOrderRows .order-row");
+
+  rows.forEach((row, idx) => {
+    row.querySelector(".m-name").value = grouped[idx] || "";
+  });
+}
+
+function renderModalRows(members, orders) {
+  const container = document.getElementById("modalOrderRows");
+  container.innerHTML = "";
+
+  orders.forEach((slot, idx) => {
+    const row = document.createElement("div");
+    row.className = "order-row";
+
+    let nameOptions = `<option value="">-- 選択 --</option>` + members.map(p => 
+      `<option value="${escapeHTML(p)}" ${p === slot.name ? 'selected' : ''}>${escapeHTML(p)}</option>`
+    ).join("");
+
+    const charInfo = allCharacters.find(c => c.id === slot.charId);
+
+    row.innerHTML = `
+      <span class="drag-handle">☰</span>
+      <div class="arrow-group">
+        <button type="button" class="btn-arrow" onclick="moveRowUp(this)">▲</button>
+        <button type="button" class="btn-arrow" onclick="moveRowDown(this)">▼</button>
+      </div>
+      <span class="slot-label" style="width:125px; font-size:0.9em;"><b>${idx + 1}人目:</b></span>
+      <select class="m-name" style="flex:1;">${nameOptions}</select>
+      
+      <input type="hidden" class="m-char" id="char_input_${idx}" value="${slot.charId || ''}">
+      <div class="char-picker-btn" onclick="openCharPalette(event, 'char_input_${idx}')">
+        <img class="char-face" src="${charInfo ? charInfo.icon : ''}" onerror="this.src=''">
+        <span style="font-size:0.85em; flex:1;">${charInfo ? charInfo.name : 'キャラ選択...'}</span>
+      </div>
+    `;
+    container.appendChild(row);
+  });
+}
+
+function moveRowUp(btn) {
+  const row = btn.closest('.order-row');
+  const prevRow = row.previousElementSibling;
+  if (prevRow) {
+    row.parentNode.insertBefore(row, prevRow);
+    updateModalLabels();
+  }
+}
+
+function moveRowDown(btn) {
+  const row = btn.closest('.order-row');
+  const nextRow = row.nextElementSibling;
+  if (nextRow) {
+    row.parentNode.insertBefore(nextRow, row);
+    updateModalLabels();
+  }
+}
+
+function updateModalLabels() {
+  const modeElement = document.querySelector('input[name="orderMode"]:checked');
+  if (!modeElement) return;
+  const mode = modeElement.value;
+  const labels = document.querySelectorAll(".slot-label");
+  const slotCount = appState.slotCount || 16;
+
+  labels.forEach((label, idx) => {
+    if (mode === 'counterPick' && idx === 0) {
+      label.innerHTML = `<b>1人目 <span style="color:#ff9f1c;">(先鋒申告)</span>:</b>`;
+    } else if (mode === 'bossFixed' && idx === slotCount - 1) {
+      label.innerHTML = `<b>${slotCount}人目 <span style="color:#ff9f1c;">(大将固定)</span>:</b>`;
+    } else {
+      label.innerHTML = `<b>${idx + 1}人目:</b>`;
+    }
+  });
+}
+
+function fillFullRandomModal() {
+  const members = (currentModalTeam === '1') ? appState.team1Members : appState.team2Members;
+  if (!members || members.length === 0) return;
+
+  const rows = document.querySelectorAll("#modalOrderRows .order-row");
+  const slotCount = appState.slotCount || 16;
+  
+  let playerPool = [];
+  while (playerPool.length < slotCount) {
+    let shuffledMembers = [...members].sort(() => Math.random() - 0.5);
+    playerPool = playerPool.concat(shuffledMembers);
+  }
+  playerPool = playerPool.slice(0, slotCount);
+
+  let shuffledChars = [...allCharacters].sort(() => Math.random() - 0.5);
+
+  rows.forEach((row, idx) => {
+    row.querySelector(".m-name").value = playerPool[idx];
+    
+    const charInput = row.querySelector(".m-char");
+    const charBtn = row.querySelector(".char-picker-btn");
+    const chosenChar = shuffledChars[idx % shuffledChars.length];
+
+    charInput.value = chosenChar.id;
+    charBtn.querySelector('img').src = chosenChar.icon;
+    charBtn.querySelector('span').textContent = chosenChar.name;
+  });
+}
+
+function saveOrderModal() {
+  const mode = document.querySelector('input[name="orderMode"]:checked').value;
+  const targetOrders = (currentModalTeam === '1') ? appState.team1Orders : appState.team2Orders;
+  const rows = document.querySelectorAll("#modalOrderRows .order-row");
+  const slotCount = appState.slotCount || 16;
+
+  let tempSelections = [];
+  rows.forEach((row) => {
+    tempSelections.push({
+      name: row.querySelector(".m-name").value,
+      charId: row.querySelector(".m-char").value,
+      revealed: false
+    });
+  });
+
+  if (mode === 'counterPick') {
+    targetOrders.match = [tempSelections[0]];
+    targetOrders.bench = tempSelections.slice(1);
+  } else if (mode === 'bossFixed') {
+    let topN = tempSelections.slice(0, slotCount - 1).sort(() => Math.random() - 0.5);
+    let finalOrder = [...topN, tempSelections[slotCount - 1]];
+    targetOrders.match = finalOrder;
+    targetOrders.bench = [];
+  } else {
+    targetOrders.match = tempSelections;
+    targetOrders.bench = [];
+  }
+
+  appState.isOrderSet = true;
+  closeOrderModal();
+  syncToFirebase();
+}
+
+function closeOrderModal() {
+  document.getElementById("orderModal").style.display = "none";
+}
+
+function handleImgError(img) {
+  img.classList.add('load-error');
+}
+
+function moveBenchToMatch(teamKey, benchIndex) {
+  const targetOrders = (teamKey === '1') ? appState.team1Orders : appState.team2Orders;
+  if (!targetOrders.bench || !targetOrders.bench[benchIndex]) return;
+
+  const movedChar = targetOrders.bench.splice(benchIndex, 1)[0];
+  movedChar.revealed = true;
+  targetOrders.match.push(movedChar);
+
+  syncToFirebase();
+}
+
+function moveMatchToBench(teamKey, matchIndex) {
+  const targetOrders = (teamKey === '1') ? appState.team1Orders : appState.team2Orders;
+  if (!targetOrders.match || !targetOrders.match[matchIndex]) return;
+
+  const movedChar = targetOrders.match.splice(matchIndex, 1)[0];
+  movedChar.revealed = false;
+  if (!targetOrders.bench) targetOrders.bench = [];
+  targetOrders.bench.push(movedChar);
+
+  syncToFirebase();
+}
+
+function renderDisplay() {
+  renderTeamDisplay('1', appState.team1Members, appState.team1Orders);
+  renderTeamDisplay('2', appState.team2Members, appState.team2Orders);
+}
+
+function renderTeamDisplay(teamKey, members, ordersObj) {
+  const matchContainer = document.getElementById(`team${teamKey}-match-display`);
+  const benchContainer = document.getElementById(`team${teamKey}-bench-display`);
+  if (!matchContainer || !benchContainer) return;
+
+  matchContainer.innerHTML = "";
+  benchContainer.innerHTML = "";
+
+  if ((currentRole === 'p1_only' && teamKey === '2') || (currentRole === 'p2_only' && teamKey === '1')) {
+    matchContainer.innerHTML = `<div style="padding:20px; text-align:center; color:#666;">（非表示）</div>`;
+    benchContainer.innerHTML = `<div style="padding:20px; text-align:center; color:#666;">（非表示）</div>`;
+    return;
+  }
+
+  const faceClass = (teamKey === '2') ? "char-face p2-face" : "char-face";
+  const modeElement = document.querySelector('input[name="orderMode"]:checked');
+  const isCounterPickMode = modeElement && modeElement.value === 'counterPick';
+
+  if (!appState.isOrderSet) {
+    if (members) {
+      members.forEach((name, idx) => {
+        const card = document.createElement("div");
+        card.className = "player-card";
+        card.innerHTML = `<span class="order-num">${idx + 1}.</span><div class="player-info"><div class="player-name">${escapeHTML(name)}</div></div>`;
+        matchContainer.appendChild(card);
       });
     }
-
-    // オーダーモーダルを開く
-    function openOrderModal(teamKey) {
-      currentEditingTeam = teamKey;
-      const teamName = teamKey === 'p1' ? '🔴 1Pチーム' : '🔵 2Pチーム';
-      document.getElementById('modal-title').innerText = `${teamName} オーダー＆キャラ設定`;
-
-      const sourceTeam = teamKey === 'p1' ? state.p1Team : state.p2Team;
-      // ディープコピーで編集用作業配列を作成
-      editingTeamTemp = JSON.parse(JSON.stringify(sourceTeam));
-
-      renderModalOrderList();
-      document.getElementById('order-modal').style.display = 'flex';
-    }
-
-    function closeOrderModal() {
-      document.getElementById('order-modal').style.display = 'none';
-    }
-
-    // モーダル内のプレイヤー＆キャラ一覧描画
-    function renderModalOrderList() {
-      const container = document.getElementById('modal-order-list');
-      container.innerHTML = '';
-
-      editingTeamTemp.forEach((player, idx) => {
-        const row = document.createElement('div');
-        row.className = 'order-item';
+  } else {
+    if (ordersObj.match) {
+      ordersObj.match.forEach((slot, idx) => {
+        const card = document.createElement("div");
+        const charInfo = allCharacters.find(c => c.id === slot.charId) || { name: "未選択", icon: "" };
+        card.className = `player-card ${slot.revealed ? '' : 'is-hidden'}`;
         
-        let charOptions = `<option value="">--キャラ選択--</option>`;
-        CHARACTERS.forEach(c => {
-          const selected = player.char === c ? 'selected' : '';
-          charOptions += `<option value="${c}" ${selected}>${c}</option>`;
-        });
-
-        row.innerHTML = `
-          <span style="width: 24px; font-weight: bold;">${idx + 1}.</span>
-          <span style="flex-grow: 1; font-weight: bold;">${escapeHtml(player.name)}</span>
-          <select onchange="updateTempChar(${idx}, this.value)">
-            ${charOptions}
-          </select>
-          <button class="btn btn-xs" onclick="moveTempOrder(${idx}, -1)">▲</button>
-          <button class="btn btn-xs" onclick="moveTempOrder(${idx}, 1)">▼</button>
-        `;
-        container.appendChild(row);
-      });
-    }
-
-    function updateTempChar(idx, charName) {
-      editingTeamTemp[idx].char = charName;
-    }
-
-    function moveTempOrder(idx, direction) {
-      const newIdx = idx + direction;
-      if (newIdx < 0 || newIdx >= editingTeamTemp.length) return;
-      const temp = editingTeamTemp[idx];
-      editingTeamTemp[idx] = editingTeamTemp[newIdx];
-      editingTeamTemp[newIdx] = temp;
-      renderModalOrderList();
-    }
-
-    // 選択されたルール（ラジオボタン）に応じて並び替えを実行
-    function runOrderRule() {
-      const mode = document.querySelector('input[name="order-mode"]:checked').value;
-      if (editingTeamTemp.length <= 1) return;
-
-      if (mode === 'shuffle-taisho') {
-        // 大将（最後の人）以外をシャッフル
-        const taisho = editingTeamTemp.pop();
-        for (let i = editingTeamTemp.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [editingTeamTemp[i], editingTeamTemp[j]] = [editingTeamTemp[j], editingTeamTemp[i]];
-        }
-        editingTeamTemp.push(taisho);
-      } else if (mode === 'kabuse') {
-        // 全体をランダムシャッフル
-        for (let i = editingTeamTemp.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [editingTeamTemp[i], editingTeamTemp[j]] = [editingTeamTemp[j], editingTeamTemp[i]];
-        }
-      } else {
-        // 完全自由シャッフル
-        for (let i = editingTeamTemp.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [editingTeamTemp[i], editingTeamTemp[j]] = [editingTeamTemp[j], editingTeamTemp[i]];
-        }
-      }
-      renderModalOrderList();
-    }
-
-    // モーダルの設定内容を確定保存
-    function saveOrderModal() {
-      if (currentEditingTeam === 'p1') {
-        state.p1Team = JSON.parse(JSON.stringify(editingTeamTemp));
-      } else {
-        state.p2Team = JSON.parse(JSON.stringify(editingTeamTemp));
-      }
-      closeOrderModal();
-      renderAll();
-    }
-
-    // チェックされたプレイヤーを1P/2Pにランダム自動振り分け
-    function autoAssignCheckedPlayers() {
-      const checkedNames = [];
-      state.playersMaster.forEach((name, idx) => {
-        const chk = document.getElementById(`p-check-${idx}`);
-        if (chk && chk.checked) {
-          checkedNames.push(name);
-        }
-      });
-
-      if (checkedNames.length === 0) {
-        alert('振り分けるプレイヤーにチェックを入れてください。');
-        return;
-      }
-
-      // シャッフル
-      for (let i = checkedNames.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [checkedNames[i], checkedNames[j]] = [checkedNames[j], checkedNames[i]];
-      }
-
-      state.p1Team = [];
-      state.p2Team = [];
-      state.p1Bench = [];
-      state.p2Bench = [];
-
-      checkedNames.forEach((name, index) => {
-        const playerObj = { name: name, char: '' };
-        if (index % 2 === 0) {
-          if (state.p1Team.length < state.maxSlots) {
-            state.p1Team.push(playerObj);
-          } else {
-            state.p1Bench.push(playerObj);
-          }
-        } else {
-          if (state.p2Team.length < state.maxSlots) {
-            state.p2Team.push(playerObj);
-          } else {
-            state.p2Bench.push(playerObj);
-          }
-        }
-      });
-
-      renderAll();
-    }
-
-    function adjustSlotsToMax() {
-      while (state.p1Team.length > state.maxSlots) {
-        state.p1Bench.push(state.p1Team.pop());
-      }
-      while (state.p2Team.length > state.maxSlots) {
-        state.p2Bench.push(state.p2Team.pop());
-      }
-    }
-
-    function renderMasterPlayers() {
-      const container = document.getElementById('player-tags-container');
-      const currentCheckedState = {};
-      state.playersMaster.forEach((_, idx) => {
-        const chk = document.getElementById(`p-check-${idx}`);
-        if (chk) {
-          currentCheckedState[idx] = chk.checked;
-        }
-      });
-
-      container.innerHTML = '';
-      state.playersMaster.forEach((name, idx) => {
-        const isChecked = currentCheckedState[idx] !== undefined ? currentCheckedState[idx] : true;
-        const tag = document.createElement('div');
-        tag.className = 'player-tag';
-        tag.innerHTML = `
-          <input type="checkbox" id="p-check-${idx}" ${isChecked ? 'checked' : ''}>
-          <label for="p-check-${idx}">${escapeHtml(name)}</label>
-          <span class="tag-remove" onclick="removeMasterPlayer(${idx})">×</span>
-        `;
-        container.appendChild(tag);
-      });
-    }
-
-    function removeMasterPlayer(idx) {
-      state.playersMaster.splice(idx, 1);
-      renderMasterPlayers();
-    }
-
-    function renderAll() {
-      renderMasterPlayers();
-      renderSlots('p1-team-list', state.p1Team, state.maxSlots, '1P');
-      renderSlots('p2-team-list', state.p2Team, state.maxSlots, '2P');
-      renderBench('p1-bench-list', state.p1Bench);
-      renderBench('p2-bench-list', state.p2Bench);
-    }
-
-    function renderSlots(containerId, teamArray, maxSlots, teamLabel) {
-      const container = document.getElementById(containerId);
-      container.innerHTML = '';
-
-      for (let i = 0; i < maxSlots; i++) {
-        const player = teamArray[i];
-        const card = document.createElement('div');
-        card.className = 'card';
-        
-        if (player) {
+        if (slot.revealed) {
           card.innerHTML = `
-            <div class="slot-idx">${i + 1}</div>
-            <div class="card-info">
-              <span class="p-name">${escapeHtml(player.name || '未設定')}</span>
-              <span class="c-name">${escapeHtml(player.char || 'キャラ未選択')}</span>
-            </div>
-            <div class="card-btns">
-              <button class="btn btn-xs">勝</button>
-              <button class="btn btn-xs">負</button>
+            <span class="order-num">${idx + 1}.</span>
+            <img class="${faceClass}" src="${charInfo.icon}" onerror="handleImgError(this)">
+            <div class="player-info">
+              <div class="player-name" title="${escapeHTML(slot.name)}">${slot.name ? escapeHTML(slot.name) : '未設定'}</div>
+              <div class="char-name">${charInfo.name}</div>
             </div>
           `;
         } else {
-          card.style.opacity = '0.4';
           card.innerHTML = `
-            <div class="slot-idx">${i + 1}</div>
-            <div class="card-info">
-              <span class="p-name" style="color:#777;">(空き枠)</span>
+            <span class="order-num">${idx + 1}.</span>
+            <img class="${faceClass}" src="image/secret.png" onerror="handleImgError(this)">
+            <div class="player-info">
+              <div class="player-name">？？？</div>
+              <div class="char-name">（伏せ）</div>
             </div>
           `;
         }
-        container.appendChild(card);
-      }
+
+        card.onclick = () => {
+          if (isCounterPickMode && idx > 0) {
+            moveMatchToBench(teamKey, idx);
+          } else {
+            slot.revealed = !slot.revealed;
+            syncToFirebase();
+          }
+        };
+
+        matchContainer.appendChild(card);
+      });
     }
 
-    function renderBench(containerId, benchArray) {
-      const container = document.getElementById(containerId);
-      container.innerHTML = '';
-      benchArray.forEach((player) => {
-        const card = document.createElement('div');
-        card.className = 'card bench-card';
+    if (ordersObj.bench) {
+      ordersObj.bench.forEach((slot, idx) => {
+        const card = document.createElement("div");
+        const charInfo = allCharacters.find(c => c.id === slot.charId) || { name: "未選択", icon: "" };
+        card.className = "player-card";
+        
         card.innerHTML = `
-          <div class="card-info">
-            <span class="p-name">${escapeHtml(player.name)}</span>
+          <img class="${faceClass}" src="${charInfo.icon}" onerror="handleImgError(this)">
+          <div class="player-info">
+            <div class="player-name" title="${escapeHTML(slot.name)}">${slot.name ? escapeHTML(slot.name) : '未設定'}</div>
+            <div class="char-name">${charInfo.name}</div>
           </div>
         `;
-        container.appendChild(card);
+
+        card.onclick = () => {
+          moveBenchToMatch(teamKey, idx);
+        };
+
+        benchContainer.appendChild(card);
       });
     }
+  }
+}
 
-    function escapeHtml(str) {
-      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-
-    window.onload = init;
-  </script>
+function escapeHTML(str) {
+  if (!str) return "";
+  return str.replace(/[&<>"']/g, function(m) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+  });
+}
+</script>
 </body>
 </html>
