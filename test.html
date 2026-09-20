@@ -1,598 +1,871 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>スパ2X リアルタイム対戦管理ツール</title>
-  <style>
-    :root {
-      --bg-color: #121212;
-      --card-bg: #1e1e1e;
-      --text-color: #ffffff;
-      --accent-color: #ff9800;
-      --p1-color: #2196f3;
-      --p2-color: #f44336;
-      --border-color: #333333;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>スパ2X 勝敗管理・星取表</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --panel-bg: #1e1e1e;
+            --text-color: #ffffff;
+            --border-color: #333333;
+            --p1-color: #ff4d4d;
+            --p2-color: #4d94ff;
+            --win-color: #ffda6a;
+            --lose-color: #555555;
+            --palette-bg: #2a2a2a;
+        }
 
-    body {
-      font-family: 'Helvetica Neue', Arial, sans-serif;
-      background-color: var(--bg-color);
-      color: var(--text-color);
-      margin: 0;
-      padding: 10px;
-      box-sizing: border-box;
-    }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 10px;
+            font-size: 14px;
+        }
 
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 10px;
-      background-color: #000;
-      border-radius: 8px;
-      margin-bottom: 15px;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
+        .header-controls {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
 
-    .room-info {
-      font-weight: bold;
-      color: var(--accent-color);
-    }
+        button, select, input {
+            background-color: #333;
+            color: #fff;
+            border: 1px solid #555;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
 
-    .header-controls {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-    }
+        button:hover { background-color: #444; }
+        button.active { background-color: #007bff; border-color: #0056b3; }
 
-    input[type="text"], select, input[type="number"] {
-      background-color: #222;
-      color: #fff;
-      border: 1px solid var(--border-color);
-      padding: 6px 10px;
-      border-radius: 4px;
-    }
+        .score-board {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            background-color: var(--panel-bg);
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border: 1px solid var(--border-color);
+        }
 
-    button {
-      background-color: var(--accent-color);
-      color: #000;
-      border: none;
-      padding: 6px 14px;
-      font-weight: bold;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: opacity 0.2s;
-    }
+        .team-score { font-size: 28px; font-weight: bold; }
+        .p1-score { color: var(--p1-color); }
+        .p2-score { color: var(--p2-color); }
 
-    button:hover { opacity: 0.8; }
-    button.secondary { background-color: #555; color: #fff; }
+        .main-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
 
-    .main-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 10px;
-      margin-bottom: 20px;
-    }
+        .team-column {
+            background-color: var(--panel-bg);
+            border-radius: 8px;
+            padding: 8px;
+            border: 1px solid var(--border-color);
+        }
 
-    .card {
-      background-color: var(--card-bg);
-      border: 1px solid var(--border-color);
-      border-radius: 6px;
-      padding: 8px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
+        .team-title {
+            text-align: center;
+            font-weight: bold;
+            padding: 6px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            font-size: 16px;
+        }
 
-    .card-header {
-      font-size: 0.85em;
-      color: #888;
-      display: flex;
-      justify-content: space-between;
-    }
+        .p1-title { background-color: rgba(255, 77, 77, 0.2); color: var(--p1-color); }
+        .p2-title { background-color: rgba(77, 148, 255, 0.2); color: var(--p2-color); }
 
-    .match-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 6px;
-    }
+        .slot-list {
+            min-height: 200px;
+        }
 
-    .side {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px;
-      border-radius: 4px;
-    }
+        .slot-card {
+            display: flex;
+            align-items: center;
+            background-color: #252525;
+            border: 1px solid #3d3d3d;
+            margin-bottom: 6px;
+            padding: 6px;
+            border-radius: 6px;
+            position: relative;
+            cursor: grab;
+            transition: border-color 0.2s, background-color 0.2s;
+        }
 
-    .side.p1 { background-color: rgba(33, 150, 243, 0.1); }
-    .side.p2 { background-color: rgba(244, 67, 54, 0.1); }
-    .side.right { flex-direction: row-reverse; text-align: right; }
+        .slot-card:active { cursor: grabbing; }
 
-    .char-img {
-      width: 48px;
-      height: 48px;
-      object-fit: contain;
-      background-color: #000;
-      border-radius: 4px;
-      border: 1px solid #444;
-    }
+        .slot-card.win { border-color: var(--win-color); background-color: rgba(255, 218, 106, 0.05); }
+        .slot-card.lose { border-color: var(--lose-color); opacity: 0.6; }
 
-    .player-details {
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
+        .slot-index {
+            width: 24px;
+            font-weight: bold;
+            color: #888;
+            text-align: center;
+        }
 
-    .p-name {
-      font-weight: bold;
-      font-size: 0.9em;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
+        .slot-info {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            margin: 0 8px;
+        }
 
-    .c-name { font-size: 0.75em; color: #aaa; }
-    .vs-badge { font-weight: bold; font-style: italic; color: var(--accent-color); font-size: 0.9em; }
+        .player-name {
+            font-weight: bold;
+            font-size: 14px;
+            color: #eee;
+            border: none;
+            background: transparent;
+            width: 100%;
+        }
 
-    /* モーダルUI */
-    .modal {
-      display: none;
-      position: fixed;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.8);
-      z-index: 100;
-      justify-content: center;
-      align-items: center;
-    }
+        .player-name:focus {
+            background-color: #333;
+            outline: 1px solid #555;
+            border-radius: 2px;
+        }
 
-    .modal.open { display: flex; }
+        .char-display {
+            font-size: 13px;
+            color: #aaa;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
 
-    .modal-content {
-      background-color: var(--card-bg);
-      border: 1px solid var(--border-color);
-      padding: 20px;
-      border-radius: 8px;
-      max-width: 900px;
-      width: 95%;
-      max-height: 90vh;
-      overflow-y: auto;
-    }
+        .char-display:hover { color: #fff; }
 
-    .modal-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 15px;
-      border-bottom: 1px solid var(--border-color);
-      padding-bottom: 10px;
-    }
+        .char-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 3px;
+            background-size: cover;
+            background-position: center;
+            display: inline-block;
+            background-color: #444;
+        }
 
-    .config-bar {
-      display: flex;
-      gap: 15px;
-      align-items: center;
-      background: #151515;
-      padding: 12px;
-      border-radius: 6px;
-      margin-bottom: 15px;
-      flex-wrap: wrap;
-    }
+        .slot-actions {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
 
-    .team-settings {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 15px;
-    }
+        .btn-action {
+            padding: 3px 6px;
+            font-size: 11px;
+            border-radius: 3px;
+        }
 
-    @media (max-width: 600px) {
-      .team-settings { grid-template-columns: 1fr; }
-    }
+        .btn-hide { background-color: #555; }
+        .btn-hide.active { background-color: #d9534f; color: white; }
 
-    .team-box {
-      border: 1px solid var(--border-color);
-      padding: 10px;
-      border-radius: 6px;
-    }
+        .btn-bench { background-color: #4a6984; }
 
-    .team-box.p1-box { border-top: 4px solid var(--p1-color); }
-    .team-box.p2-box { border-top: 4px solid var(--p2-color); }
+        .bench-area {
+            margin-top: 15px;
+            background-color: #181818;
+            border: 1px dashed #444;
+            padding: 8px;
+            border-radius: 6px;
+        }
 
-    .slot-row {
-      display: flex;
-      gap: 5px;
-      margin-bottom: 6px;
-      align-items: center;
-    }
+        .bench-title {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 6px;
+            text-align: center;
+        }
 
-    .slot-num { width: 22px; font-size: 0.8em; color: #888; }
+        .bench-list {
+            min-height: 50px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
 
-    .bench-area {
-      margin-top: 15px;
-      padding: 10px;
-      background: #111;
-      border-radius: 6px;
-    }
+        /* キャラクター選択パレット */
+        .char-palette-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
 
-    .bench-title { font-size: 0.85em; color: var(--accent-color); margin-bottom: 5px; }
-    .bench-list { display: flex; flex-wrap: wrap; gap: 8px; }
+        .palette-content {
+            background-color: var(--palette-bg);
+            padding: 15px;
+            border-radius: 8px;
+            max-width: 500px;
+            width: 90%;
+            border: 1px solid #555;
+        }
 
-    .bench-chip {
-      background: #222;
-      border: 1px solid #444;
-      padding: 3px 8px;
-      border-radius: 4px;
-      font-size: 0.8em;
-    }
-  </style>
+        .palette-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-top: 10px;
+            max-height: 350px;
+            overflow-y: auto;
+        }
+
+        .char-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 6px;
+            background: #333;
+            border-radius: 4px;
+            cursor: pointer;
+            border: 1px solid transparent;
+        }
+
+        .char-item:hover {
+            border-color: #007bff;
+            background: #444;
+        }
+
+        .char-item-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+            margin-bottom: 4px;
+            background-size: cover;
+            background-position: center;
+            background-color: #222;
+        }
+
+        /* 設定モーダル */
+        .settings-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .settings-content {
+            background-color: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 85vh;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+        }
+
+        .settings-section {
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #333;
+        }
+
+        .settings-section h4 {
+            margin: 0 0 8px 0;
+            color: #007bff;
+        }
+
+        .form-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .form-group label { width: 140px; }
+
+        .player-inputs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .team-player-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+    </style>
 </head>
 <body>
 
-  <header>
-    <div class="room-info">
-      部屋名: <span id="display-room-name">未接続</span>
-    </div>
     <div class="header-controls">
-      <input type="text" id="room-input" placeholder="部屋名を入力">
-      <button onclick="changeRoom()">部屋移動</button>
-      <button onclick="openModal()" class="secondary">⚙ オーダー・ルール設定</button>
+        <button id="btn-settings">⚙️ 設定・ルール変更</button>
+        <button id="btn-auto-fill">👥 プレイヤー連続初期配置</button>
+        <button id="btn-counter-mode">🛡️ 被せモード: OFF</button>
+        <button id="btn-reset-scores">🔄 勝敗リセット</button>
     </div>
-  </header>
 
-  <!-- メイン表示（対戦枠） -->
-  <div class="main-grid" id="match-cards-container"></div>
-
-  <!-- ベンチ（控えメンバー表示） -->
-  <div class="bench-area" id="bench-container" style="display: none;">
-    <div class="bench-title">ベンチ（控えメンバー）</div>
-    <div class="bench-list" id="bench-list"></div>
-  </div>
-
-  <!-- 設定モーダル -->
-  <div class="modal" id="settings-modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3>対戦オーダー・ルール設定</h3>
-        <button onclick="closeModal()">✕ 閉じる</button>
-      </div>
-
-      <!-- ルール設定バー -->
-      <div class="config-bar">
-        <div>
-          <label>1人あたりの持ちキャラ数: </label>
-          <select id="chars-per-player-select" onchange="applyRuleSettings()">
-            <option value="1">1キャラ（通常）</option>
-            <option value="2">2キャラ（4人8枠 / 6人12枠など）</option>
-            <option value="3">3キャラ</option>
-            <option value="4">4キャラ</option>
-          </select>
-        </div>
-
-        <div>
-          <label>合計対戦枠数: </label>
-          <select id="total-slots-select" onchange="applyRuleSettings()">
-            <option value="6">6枠 (3vs3)</option>
-            <option value="8">8枠 (4vs4)</option>
-            <option value="10">10枠 (5vs5)</option>
-            <option value="12">12枠 (6vs6)</option>
-            <option value="14">14枠 (7vs7)</option>
-            <option value="16" selected>16枠 (8vs8)</option>
-          </select>
-        </div>
-
-        <div>
-          <label>
-            <input type="checkbox" id="counter-mode-toggle" onchange="toggleCounterMode()"> 被せモード
-          </label>
-        </div>
-      </div>
-
-      <!-- チーム設定 -->
-      <div class="team-settings">
-        <!-- 1P チーム -->
-        <div class="team-box p1-box">
-          <h4>1P チーム エントリー</h4>
-          <div style="margin-bottom: 10px; display: flex; flex-direction: column; gap: 5px;">
-            <input type="text" id="p1-players-input" placeholder="参加者名をカンマ区切り (例: A, B, C)">
-            <button onclick="autoGenerateSlots('p1')" class="secondary">👥 プレイヤー名から枠を自動作成</button>
-          </div>
-          <hr style="border-color: #333; margin: 10px 0;">
-          <div id="p1-slots-inputs"></div>
-          <button onclick="randomizeTeam('p1')" class="secondary" style="width: 100%; margin-top: 8px;">🎲 1P キャラランダム設定</button>
-        </div>
-
-        <!-- 2P チーム -->
-        <div class="team-box p2-box">
-          <h4>2P チーム エントリー</h4>
-          <div style="margin-bottom: 10px; display: flex; flex-direction: column; gap: 5px;">
-            <input type="text" id="p2-players-input" placeholder="参加者名をカンマ区切り (例: D, E, F)">
-            <button onclick="autoGenerateSlots('p2')" class="secondary">👥 プレイヤー名から枠を自動作成</button>
-          </div>
-          <hr style="border-color: #333; margin: 10px 0;">
-          <div id="p2-slots-inputs"></div>
-          <button onclick="randomizeTeam('p2')" class="secondary" style="width: 100%; margin-top: 8px;">🎲 2P キャラランダム設定</button>
-        </div>
-      </div>
-
-      <div style="margin-top: 20px; display: flex; justify-content: space-between;">
-        <button onclick="clearAllData()" class="secondary" style="background-color: #c62828; color: #fff;">全データリセット</button>
-        <button onclick="saveAndCloseModal()">保存して適用</button>
-      </div>
+    <div class="score-board">
+        <div class="team-score p1-score" id="p1-total-score">1P: 0</div>
+        <div style="color: #888;">VS</div>
+        <div class="team-score p2-score" id="p2-total-score">2P: 0</div>
     </div>
-  </div>
 
-  <!-- Firebase SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
-
-  <script>
-    const CHARACTERS = [
-      { id: "ryu", name: "リュウ" },
-      { id: "ken", name: "ケン" },
-      { id: "e_honda", name: "エドモンド本田" },
-      { id: "chun_li", name: "春麗" },
-      { id: "blanka", name: "ブランカ" },
-      { id: "zangief", name: "ザンギエフ" },
-      { id: "guile", name: "ガイル" },
-      { id: "dhalsim", name: "ダルシム" },
-      { id: "feilong", name: "飛龍（フェイロン）" },
-      { id: "cammy", name: "キャミィ" },
-      { id: "t_hawk", name: "サンダー・ホーク" },
-      { id: "dee_jay", name: "ディージェイ" },
-      { id: "boxer", name: "バイソン" },
-      { id: "m_bison", name: "バルログ" },
-      { id: "sagat", name: "サガット" },
-      { id: "vega", name: "ベガ" }
-    ];
-
-    const firebaseConfig = {
-      databaseURL: "https://sf2x-app-default-rtdb.firebaseio.com/"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
-
-    let currentRoom = "default";
-    let totalSlots = 16;
-    let charsPerPlayer = 1;
-    let isCounterMode = false;
-    let roomData = {
-      totalSlots: 16,
-      charsPerPlayer: 1,
-      isCounterMode: false,
-      p1: [],
-      p2: []
-    };
-
-    window.addEventListener('DOMContentLoaded', () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const roomParam = urlParams.get('room');
-      currentRoom = roomParam ? roomParam : 'room1';
-      document.getElementById('display-room-name').innerText = currentRoom;
-      document.getElementById('room-input').value = currentRoom;
-
-      initDataStructure();
-      listenToRoomData();
-    });
-
-    function initDataStructure() {
-      roomData.p1 = Array.from({ length: 8 }, (_, i) => ({ player: `1P_P${i+1}`, char: CHARACTERS[i % 16].id }));
-      roomData.p2 = Array.from({ length: 8 }, (_, i) => ({ player: `2P_P${i+1}`, char: CHARACTERS[(i+8) % 16].id }));
-    }
-
-    function listenToRoomData() {
-      const roomRef = db.ref('sf2x_rooms/' + currentRoom);
-      roomRef.on('value', (snapshot) => {
-        const val = snapshot.val();
-        if (val) {
-          roomData = val;
-          if (!roomData.p1) roomData.p1 = [];
-          if (!roomData.p2) roomData.p2 = [];
-          totalSlots = roomData.totalSlots || 16;
-          charsPerPlayer = roomData.charsPerPlayer || 1;
-          isCounterMode = !!roomData.isCounterMode;
-        } else {
-          roomData.totalSlots = totalSlots;
-          roomData.charsPerPlayer = charsPerPlayer;
-          roomData.isCounterMode = isCounterMode;
-          saveToFirebase();
-        }
-        renderUI();
-      });
-    }
-
-    function saveToFirebase() {
-      roomData.totalSlots = totalSlots;
-      roomData.charsPerPlayer = charsPerPlayer;
-      roomData.isCounterMode = isCounterMode;
-      db.ref('sf2x_rooms/' + currentRoom).set(roomData);
-    }
-
-    function changeRoom() {
-      const newRoom = document.getElementById('room-input').value.trim();
-      if (newRoom) {
-        window.location.search = `?room=${encodeURIComponent(newRoom)}`;
-      }
-    }
-
-    function renderUI() {
-      const container = document.getElementById('match-cards-container');
-      container.innerHTML = '';
-      const matchPairs = totalSlots / 2;
-
-      for (let i = 0; i < matchPairs; i++) {
-        const p1Data = roomData.p1[i] || { player: '', char: 'ryu' };
-        const p2Data = roomData.p2[i] || { player: '', char: 'ryu' };
-
-        const card = document.createElement('div');
-        card.className = 'card';
-        card.innerHTML = `
-          <div class="card-header">
-            <span>第 ${i + 1} 試合</span>
-          </div>
-          <div class="match-row">
-            <div class="side p1">
-              <img src="image/${p1Data.char}_0.png" class="char-img" onerror="this.src='https://via.placeholder.com/48?text=?';">
-              <div class="player-details">
-                <span class="p-name">${escapeHtml(p1Data.player)}</span>
-                <span class="c-name">${getCharName(p1Data.char)}</span>
-              </div>
+    <div class="main-container">
+        <!-- 1P Column -->
+        <div class="team-column">
+            <div class="team-title p1-title" id="p1-team-name-display">1P チーム</div>
+            <div class="slot-list" id="p1-slot-list"></div>
+            <div class="bench-area">
+                <div class="bench-title">ベンチ (控え)</div>
+                <div class="bench-list" id="p1-bench-list"></div>
             </div>
-            <div class="vs-badge">VS</div>
-            <div class="side p2 right">
-              <img src="image/${p2Data.char}_0.png" class="char-img" onerror="this.src='https://via.placeholder.com/48?text=?';">
-              <div class="player-details">
-                <span class="p-name">${escapeHtml(p2Data.player)}</span>
-                <span class="c-name">${getCharName(p2Data.char)}</span>
-              </div>
+        </div>
+
+        <!-- 2P Column -->
+        <div class="team-column">
+            <div class="team-title p2-title" id="p2-team-name-display">2P チーム</div>
+            <div class="slot-list" id="p2-slot-list"></div>
+            <div class="bench-area">
+                <div class="bench-title">ベンチ (控え)</div>
+                <div class="bench-list" id="p2-bench-list"></div>
             </div>
-          </div>
-        `;
-        container.appendChild(card);
-      }
-    }
+        </div>
+    </div>
 
-    // --- モーダル制御 ---
-    function openModal() {
-      document.getElementById('total-slots-select').value = totalSlots;
-      document.getElementById('chars-per-player-select').value = charsPerPlayer;
-      document.getElementById('counter-mode-toggle').checked = isCounterMode;
-      renderModalInputs();
-      document.getElementById('settings-modal').classList.add('open');
-    }
+    <!-- キャラクター選択モーダル -->
+    <div class="char-palette-modal" id="char-modal">
+        <div class="palette-content">
+            <h3 style="margin-top:0;">キャラクター選択</h3>
+            <div class="palette-grid" id="palette-grid"></div>
+            <div style="text-align: right; margin-top: 15px;">
+                <button id="btn-close-char-modal">キャンセル</button>
+            </div>
+        </div>
+    </div>
 
-    function closeModal() {
-      document.getElementById('settings-modal').classList.remove('open');
-    }
+    <!-- 設定モーダル -->
+    <div class="settings-modal" id="settings-modal">
+        <div class="settings-content">
+            <h3 style="margin-top:0;">対戦設定・人数振り分け</h3>
+            
+            <div class="settings-section">
+                <h4>1. 人数と枠数の設定</h4>
+                <div class="form-group">
+                    <label>参加人数:</label>
+                    <select id="setting-player-count">
+                        <option value="2">2人 (1vs1)</option>
+                        <option value="3">3人 (2vs1)</option>
+                        <option value="4">4人 (2vs2)</option>
+                        <option value="5">5人 (3vs2)</option>
+                        <option value="6" selected>6人 (3vs3)</option>
+                        <option value="7">7人 (4vs3)</option>
+                        <option value="8">8人 (4vs4)</option>
+                        <option value="9">9人 (5vs4)</option>
+                        <option value="10">10人 (5vs5)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>総キャラ数 (合計枠数):</label>
+                    <select id="setting-total-slots">
+                        <option value="6">6枠 (3vs3)</option>
+                        <option value="8">8枠 (4vs4)</option>
+                        <option value="10">10枠 (5vs5)</option>
+                        <option value="12" selected>12枠 (6vs6)</option>
+                        <option value="14">14枠 (7vs7)</option>
+                        <option value="16">16枠 (8vs8)</option>
+                    </select>
+                </div>
+                <div id="calc-result-info" style="font-size: 12px; color: #aaa; background: #222; padding: 6px; border-radius: 4px;">
+                    計算結果: 1P(3人/各2キャラ) vs 2P(3人/各2キャラ)
+                </div>
+            </div>
 
-    function applyRuleSettings() {
-      totalSlots = parseInt(document.getElementById('total-slots-select').value, 10);
-      charsPerPlayer = parseInt(document.getElementById('chars-per-player-select').value, 10);
-      renderModalInputs();
-    }
+            <div class="settings-section">
+                <h4>2. チーム名とプレイヤー名</h4>
+                <div class="form-group">
+                    <label>1P チーム名:</label>
+                    <input type="text" id="setting-p1-team-name" value="1P チーム">
+                </div>
+                <div class="form-group">
+                    <label>2P チーム名:</label>
+                    <input type="text" id="setting-p2-team-name" value="2P チーム">
+                </div>
 
-    function renderModalInputs() {
-      const teamSlots = totalSlots / 2;
-      const p1Box = document.getElementById('p1-slots-inputs');
-      const p2Box = document.getElementById('p2-slots-inputs');
+                <div class="player-inputs">
+                    <div>
+                        <div style="font-weight:bold; color:var(--p1-color); margin-bottom:4px;">1P メンバー</div>
+                        <div class="team-player-list" id="p1-player-inputs"></div>
+                    </div>
+                    <div>
+                        <div style="font-weight:bold; color:var(--p2-color); margin-bottom:4px;">2P メンバー</div>
+                        <div class="team-player-list" id="p2-player-inputs"></div>
+                    </div>
+                </div>
+            </div>
 
-      p1Box.innerHTML = '';
-      p2Box.innerHTML = '';
+            <div style="text-align: right; display: flex; gap: 8px; justify-content: flex-end;">
+                <button id="btn-save-settings" style="background-color: #28a745;">保存して反映</button>
+                <button id="btn-close-settings">キャンセル</button>
+            </div>
+        </div>
+    </div>
 
-      for (let i = 0; i < teamSlots; i++) {
-        p1Box.appendChild(createSlotInputRow('p1', i));
-        p2Box.appendChild(createSlotInputRow('p2', i));
-      }
-    }
+    <script>
+        // キャラクターマスターデータ (スパ2X 全17キャラ + 未設定)
+        const CHARACTERS = [
+            { id: 'none', name: '未設定', icon: '' },
+            { id: 'ryu', name: 'リュウ', icon: '' },
+            { id: 'ken', name: 'ケン', icon: '' },
+            { id: 'chunli', name: '春麗', icon: '' },
+            { id: 'guile', name: 'ガイル', icon: '' },
+            { id: 'zangief', name: 'ザンギエフ', icon: '' },
+            { id: 'dhalsim', name: 'ダルシム', icon: '' },
+            { id: 'blanca', name: 'ブランカ', icon: '' },
+            { id: 'honda', name: 'エドモンド本田', icon: '' },
+            { id: 'feilong', name: 'フェイロン', icon: '' },
+            { id: 'deejay', name: 'ディージェイ', icon: '' },
+            { id: 'hawk', name: 'T.ホーク', icon: '' },
+            { id: 'cammy', name: 'キャミィ', icon: '' },
+            { id: 'boxer', name: 'バイソン', icon: '' },
+            { id: 'claw', name: 'バルログ', icon: '' },
+            { id: 'sagat', name: 'サガット', icon: '' },
+            { id: 'dictator', name: 'ベガ', icon: '' },
+            { id: 'akuma', name: '豪鬼', icon: '' }
+        ];
 
-    function createSlotInputRow(team, index) {
-      const data = (roomData[team] && roomData[team][index]) ? roomData[team][index] : { player: `P${index+1}`, char: 'ryu' };
-      const row = document.createElement('div');
-      row.className = 'slot-row';
+        // アプリケーション全体の状態データ
+        let state = {
+            totalSlotsPerTeam: 6, // 片側の枠数 (デフォルト: 12キャラ＝6vs6)
+            playerCount: 6,
+            counterMode: false,
+            p1TeamName: '1P チーム',
+            p2TeamName: '2P チーム',
+            p1Players: ['プレイヤー1', 'プレイヤー2', 'プレイヤー3'],
+            p2Players: ['プレイヤー4', 'プレイヤー5', 'プレイヤー6'],
+            p1Slots: [],
+            p2Slots: [],
+            p1Bench: [],
+            p2Bench: []
+        };
 
-      let charOptions = CHARACTERS.map(c => 
-        `<option value="${c.id}" ${data.char === c.id ? 'selected' : ''}>${c.name}</option>`
-      ).join('');
+        let activeTargetSlot = null; // キャラクター選択対象のスロット情報
 
-      row.innerHTML = `
-        <span class="slot-num">${index + 1}</span>
-        <input type="text" id="${team}-p-name-${index}" value="${escapeHtml(data.player)}" placeholder="名前" style="flex: 1;">
-        <select id="${team}-c-select-${index}">
-          ${charOptions}
-        </select>
-      `;
-      return row;
-    }
-
-    // 👥 プレイヤー名から枠を自動作成（1人○キャラを考慮）
-    function autoGenerateSlots(team) {
-      const inputVal = document.getElementById(`${team}-players-input`).value;
-      if (!inputVal.trim()) return;
-
-      const players = inputVal.split(/[,、\n]/).map(s => s.trim()).filter(s => s.length > 0);
-      if (players.length === 0) return;
-
-      const teamSlots = totalSlots / 2;
-      let playerIndex = 0;
-      let countForCurrentPlayer = 0;
-
-      for (let i = 0; i < teamSlots; i++) {
-        const nameInput = document.getElementById(`${team}-p-name-${i}`);
-        if (nameInput) {
-          const currentPlayerName = players[playerIndex % players.length];
-          nameInput.value = currentPlayerName;
-
-          countForCurrentPlayer++;
-          if (countForCurrentPlayer >= charsPerPlayer) {
-            playerIndex++;
-            countForCurrentPlayer = 0;
-          }
+        // 初期化処理
+        function initApp() {
+            initDefaultSlots();
+            setupSortable();
+            setupEventListeners();
+            renderAll();
         }
-      }
-    }
 
-    function randomizeTeam(team) {
-      const teamSlots = totalSlots / 2;
-      let shuffledChars = [...CHARACTERS].sort(() => Math.random() - 0.5);
-
-      for (let i = 0; i < teamSlots; i++) {
-        const selectEl = document.getElementById(`${team}-c-select-${i}`);
-        if (selectEl) {
-          selectEl.value = shuffledChars[i % shuffledChars.length].id;
+        // 枠数に基づいて初期スロット生成
+        function initDefaultSlots() {
+            state.p1Slots = [];
+            state.p2Slots = [];
+            for (let i = 0; i < state.totalSlotsPerTeam; i++) {
+                state.p1Slots.push(createEmptySlot(i));
+                state.p2Slots.push(createEmptySlot(i));
+            }
         }
-      }
-    }
 
-    function saveAndCloseModal() {
-      totalSlots = parseInt(document.getElementById('total-slots-select').value, 10);
-      charsPerPlayer = parseInt(document.getElementById('chars-per-player-select').value, 10);
-      isCounterMode = document.getElementById('counter-mode-toggle').checked;
+        function createEmptySlot(index) {
+            return {
+                id: 'slot_' + Math.random().toString(36).substr(2, 9),
+                playerName: `プレイヤー${index + 1}`,
+                charId: 'none',
+                isSecret: false,
+                result: 'none' // 'win', 'lose', 'none'
+            };
+        }
 
-      const teamSlots = totalSlots / 2;
-      let newP1 = [];
-      let newP2 = [];
+        // --- 設定・配分計算ロジック ---
 
-      for (let i = 0; i < teamSlots; i++) {
-        const p1Name = document.getElementById(`p1-p-name-${i}`)?.value || `1P_${i+1}`;
-        const p1Char = document.getElementById(`p1-c-select-${i}`)?.value || 'ryu';
-        newP1.push({ player: p1Name, char: p1Char });
+        function calculateDistribution(totalPlayers, totalSlots) {
+            const p1Count = Math.ceil(totalPlayers / 2);
+            const p2Count = Math.floor(totalPlayers / 2);
+            const slotsPerSide = totalSlots / 2;
 
-        const p2Name = document.getElementById(`p2-p-name-${i}`)?.value || `2P_${i+1}`;
-        const p2Char = document.getElementById(`p2-c-select-${i}`)?.value || 'ryu';
-        newP2.push({ player: p2Name, char: p2Char });
-      }
+            function getCharAllocation(playerCount, totalSideSlots) {
+                const base = Math.floor(totalSideSlots / playerCount);
+                const remainder = totalSideSlots % playerCount;
+                const allocation = [];
+                for (let i = 0; i < playerCount; i++) {
+                    allocation.push(base + (i < remainder ? 1 : 0));
+                }
+                return allocation;
+            }
 
-      roomData.p1 = newP1;
-      roomData.p2 = newP2;
+            return {
+                p1Count,
+                p2Count,
+                slotsPerSide,
+                p1Alloc: getCharAllocation(p1Count, slotsPerSide),
+                p2Alloc: getCharAllocation(p2Count, slotsPerSide)
+            };
+        }
 
-      saveToFirebase();
-      closeModal();
-    }
+        function updateCalcResultDisplay() {
+            const pCount = parseInt(document.getElementById('setting-player-count').value, 10);
+            const tSlots = parseInt(document.getElementById('setting-total-slots').value, 10);
+            const res = calculateDistribution(pCount, tSlots);
 
-    function clearAllData() {
-      if (confirm("本当にこの部屋のオーダーを初期化しますか？")) {
-        initDataStructure();
-        saveToFirebase();
-        closeModal();
-      }
-    }
+            const p1Text = `1P(${res.p1Count}人: ${res.p1Alloc.join('〜')}キャラ)`;
+            const p2Text = `2P(${res.p2Count}人: ${res.p2Alloc.join('〜')}キャラ)`;
+            document.getElementById('calc-result-info').innerText = `計算結果: 片側${res.slotsPerSide}枠 | ${p1Text} vs ${p2Text}`;
+            
+            renderPlayerInputs(res.p1Count, res.p2Count);
+        }
 
-    function toggleCounterMode() {
-      isCounterMode = document.getElementById('counter-mode-toggle').checked;
-    }
+        function renderPlayerInputs(p1Count, p2Count) {
+            const p1Container = document.getElementById('p1-player-inputs');
+            const p2Container = document.getElementById('p2-player-inputs');
 
-    function getCharName(id) {
-      const charObj = CHARACTERS.find(c => c.id === id);
-      return charObj ? charObj.name : id;
-    }
+            p1Container.innerHTML = '';
+            p2Container.innerHTML = '';
 
-    function escapeHtml(str) {
-      if (!str) return '';
-      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-  </script>
+            for (let i = 0; i < p1Count; i++) {
+                const val = state.p1Players[i] || `1P_P${i+1}`;
+                p1Container.innerHTML += `<input type="text" class="p1-player-input" value="${val}">`;
+            }
+            for (let i = 0; i < p2Count; i++) {
+                const val = state.p2Players[i] || `2P_P${i+1}`;
+                p2Container.innerHTML += `<input type="text" class="p2-player-input" value="${val}">`;
+            }
+        }
+
+        // --- 交互（A, B, C, A, B, C...）連続回避・自動連続初期配置 ---
+
+        function autoFillGroupedPlayers() {
+            const pCount = state.playerCount;
+            const tSlots = state.totalSlotsPerTeam * 2;
+            const res = calculateDistribution(pCount, tSlots);
+
+            function buildRotatedList(players, alloc) {
+                let pool = [];
+                alloc.forEach((count, idx) => {
+                    const name = players[idx] || `P${idx+1}`;
+                    for (let i = 0; i < count; i++) pool.push(name);
+                });
+
+                // A, B, C, A, B, C... と並ぶように配置
+                let result = [];
+                let playerQueues = players.map((p, idx) => {
+                    return new Array(alloc[idx]).fill(p);
+                });
+
+                let added = true;
+                while (added) {
+                    added = false;
+                    for (let i = 0; i < playerQueues.length; i++) {
+                        if (playerQueues[i].length > 0) {
+                            result.push(playerQueues[i].shift());
+                            added = true;
+                        }
+                    }
+                }
+                return result;
+            }
+
+            const p1Order = buildRotatedList(state.p1Players, res.p1Alloc);
+            const p2Order = buildRotatedList(state.p2Players, res.p2Alloc);
+
+            // 枠数の更新に伴う調整
+            state.totalSlotsPerTeam = res.slotsPerSide;
+            
+            state.p1Slots = p1Order.map((name, i) => ({
+                id: 'slot_p1_' + i + '_' + Math.random().toString(36).substr(2, 5),
+                playerName: name,
+                charId: state.p1Slots[i]?.charId || 'none',
+                isSecret: false,
+                result: state.p1Slots[i]?.result || 'none'
+            }));
+
+            state.p2Slots = p2Order.map((name, i) => ({
+                id: 'slot_p2_' + i + '_' + Math.random().toString(36).substr(2, 5),
+                playerName: name,
+                charId: state.p2Slots[i]?.charId || 'none',
+                isSecret: false,
+                result: state.p2Slots[i]?.result || 'none'
+            }));
+
+            renderAll();
+        }
+
+        // --- UIレンダリング ---
+
+        function renderAll() {
+            document.getElementById('p1-team-name-display').innerText = state.p1TeamName;
+            document.getElementById('p2-team-name-display').innerText = state.p2TeamName;
+
+            renderSlotList('p1', state.p1Slots, 'p1-slot-list');
+            renderSlotList('p2', state.p2Slots, 'p2-slot-list');
+            renderBenchList('p1', state.p1Bench, 'p1-bench-list');
+            renderBenchList('p2', state.p2Bench, 'p2-bench-list');
+
+            updateScores();
+        }
+
+        function renderSlotList(team, slots, containerId) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+
+            slots.forEach((slot, index) => {
+                const charInfo = CHARACTERS.find(c => c.id === slot.charId) || CHARACTERS[0];
+                const card = document.createElement('div');
+                card.className = `slot-card ${slot.result}`;
+                card.dataset.id = slot.id;
+
+                const displayCharName = slot.isSecret ? '???' : charInfo.name;
+
+                card.innerHTML = `
+                    <div class="slot-index">${index + 1}</div>
+                    <div class="slot-info">
+                        <input type="text" class="player-name" value="${escapeHtml(slot.playerName)}" data-team="${team}" data-index="${index}">
+                        <div class="char-display" onclick="openCharModal('${team}', ${index}, 'slot')">
+                            <span class="char-icon"></span>
+                            <span>${displayCharName}</span>
+                        </div>
+                    </div>
+                    <div class="slot-actions">
+                        <button class="btn-action btn-hide ${slot.isSecret ? 'active' : ''}" onclick="toggleSecret('${team}', ${index})">伏せ</button>
+                        <button class="btn-action ${slot.result === 'win' ? 'active' : ''}" onclick="setResult('${team}', ${index}, 'win')">勝</button>
+                        <button class="btn-action ${slot.result === 'lose' ? 'active' : ''}" onclick="setResult('${team}', ${index}, 'lose')">負</button>
+                        <button class="btn-action btn-bench" onclick="moveToBench('${team}', ${index})">控</button>
+                    </div>
+                `;
+
+                // プレイヤー名のリアルタイム更新処理
+                const nameInput = card.querySelector('.player-name');
+                nameInput.addEventListener('change', (e) => {
+                    slots[index].playerName = e.target.value;
+                });
+
+                container.appendChild(card);
+            });
+        }
+
+        function renderBenchList(team, benchSlots, containerId) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+
+            benchSlots.forEach((slot, index) => {
+                const charInfo = CHARACTERS.find(c => c.id === slot.charId) || CHARACTERS[0];
+                const card = document.createElement('div');
+                card.className = 'slot-card';
+                card.style.opacity = '0.8';
+                card.dataset.id = slot.id;
+
+                card.innerHTML = `
+                    <div class="slot-info">
+                        <span style="font-weight:bold;">${escapeHtml(slot.playerName)}</span>
+                        <span style="font-size:11px; color:#aaa;">${charInfo.name}</span>
+                    </div>
+                    <div class="slot-actions">
+                        <button class="btn-action" onclick="moveFromBench('${team}', ${index})">復帰</button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // --- 勝敗＆スコア計算 ---
+
+        function setResult(team, index, resType) {
+            const targetSlots = team === 'p1' ? state.p1Slots : state.p2Slots;
+            const opponentSlots = team === 'p1' ? state.p2Slots : state.p1Slots;
+
+            if (targetSlots[index].result === resType) {
+                targetSlots[index].result = 'none';
+                if (opponentSlots[index]) opponentSlots[index].result = 'none';
+            } else {
+                targetSlots[index].result = resType;
+                // 連動して対戦相手の結果も自動補完
+                if (opponentSlots[index]) {
+                    opponentSlots[index].result = resType === 'win' ? 'lose' : 'win';
+                }
+            }
+            renderAll();
+        }
+
+        function updateScores() {
+            const p1Wins = state.p1Slots.filter(s => s.result === 'win').length;
+            const p2Wins = state.p2Slots.filter(s => s.result === 'win').length;
+
+            document.getElementById('p1-total-score').innerText = `${state.p1TeamName}: ${p1Wins}`;
+            document.getElementById('p2-total-score').innerText = `${state.p2TeamName}: ${p2Wins}`;
+        }
+
+        function toggleSecret(team, index) {
+            const targetSlots = team === 'p1' ? state.p1Slots : state.p2Slots;
+            targetSlots[index].isSecret = !targetSlots[index].isSecret;
+            renderAll();
+        }
+
+        // --- ベンチ移動機能 ---
+
+        function moveToBench(team, index) {
+            const slots = team === 'p1' ? state.p1Slots : state.p2Slots;
+            const bench = team === 'p1' ? state.p1Bench : state.p2Bench;
+            
+            const [moved] = slots.splice(index, 1);
+            bench.push(moved);
+            renderAll();
+        }
+
+        function moveFromBench(team, index) {
+            const slots = team === 'p1' ? state.p1Slots : state.p2Slots;
+            const bench = team === 'p1' ? state.p1Bench : state.p2Bench;
+
+            const [moved] = bench.splice(index, 1);
+            slots.push(moved);
+            renderAll();
+        }
+
+        // --- ドラッグ＆ドロップ (SortableJS) ---
+
+        function setupSortable() {
+            const p1List = document.getElementById('p1-slot-list');
+            const p2List = document.getElementById('p2-slot-list');
+
+            const options = {
+                animation: 150,
+                onEnd: function (evt) {
+                    const team = evt.to.id.includes('p1') ? 'p1' : 'p2';
+                    const slots = team === 'p1' ? state.p1Slots : state.p2Slots;
+                    
+                    const movedItem = slots.splice(evt.oldIndex, 1)[0];
+                    slots.splice(evt.newIndex, 0, movedItem);
+                    
+                    renderAll();
+                }
+            };
+
+            new Sortable(p1List, options);
+            new Sortable(p2List, options);
+        }
+
+        // --- キャラモーダルモーダル制御 ---
+
+        function openCharModal(team, index, location) {
+            activeTargetSlot = { team, index, location };
+            const grid = document.getElementById('palette-grid');
+            grid.innerHTML = '';
+
+            CHARACTERS.forEach(char => {
+                const item = document.createElement('div');
+                item.className = 'char-item';
+                item.innerHTML = `
+                    <div class="char-item-icon"></div>
+                    <div style="font-size:11px;">${char.name}</div>
+                `;
+                item.onclick = () => selectCharacter(char.id);
+                grid.appendChild(item);
+            });
+
+            document.getElementById('char-modal').style.display = 'flex';
+        }
+
+        function selectCharacter(charId) {
+            if (!activeTargetSlot) return;
+            const { team, index, location } = activeTargetSlot;
+            
+            if (location === 'slot') {
+                const slots = team === 'p1' ? state.p1Slots : state.p2Slots;
+                slots[index].charId = charId;
+            }
+            
+            document.getElementById('char-modal').style.display = 'none';
+            renderAll();
+        }
+
+        // --- イベントリスナー設定 ---
+
+        function setupEventListeners() {
+            // モーダル開閉
+            document.getElementById('btn-settings').onclick = () => {
+                document.getElementById('setting-player-count').value = state.playerCount;
+                document.getElementById('setting-total-slots').value = state.totalSlotsPerTeam * 2;
+                document.getElementById('setting-p1-team-name').value = state.p1TeamName;
+                document.getElementById('setting-p2-team-name').value = state.p2TeamName;
+                updateCalcResultDisplay();
+                document.getElementById('settings-modal').style.display = 'flex';
+            };
+
+            document.getElementById('btn-close-settings').onclick = () => {
+                document.getElementById('settings-modal').style.display = 'none';
+            };
+
+            document.getElementById('btn-close-char-modal').onclick = () => {
+                document.getElementById('char-modal').style.display = 'none';
+            };
+
+            // 設定変更時のリアルタイム計算更新
+            document.getElementById('setting-player-count').onchange = updateCalcResultDisplay;
+            document.getElementById('setting-total-slots').onchange = updateCalcResultDisplay;
+
+            // 設定保存
+            document.getElementById('btn-save-settings').onclick = () => {
+                state.playerCount = parseInt(document.getElementById('setting-player-count').value, 10);
+                const totalSlots = parseInt(document.getElementById('setting-total-slots').value, 10);
+                state.totalSlotsPerTeam = totalSlots / 2;
+
+                state.p1TeamName = document.getElementById('setting-p1-team-name').value;
+                state.p2TeamName = document.getElementById('setting-p2-team-name').value;
+
+                // プレイヤー名取得
+                state.p1Players = Array.from(document.querySelectorAll('.p1-player-input')).map(i => i.value);
+                state.p2Players = Array.from(document.querySelectorAll('.p2-player-input')).map(i => i.value);
+
+                document.getElementById('settings-modal').style.display = 'none';
+                autoFillGroupedPlayers(); // 設定変更時に自動連続初期配置を適用
+            };
+
+            // 被せモード切り替え
+            document.getElementById('btn-counter-mode').onclick = (e) => {
+                state.counterMode = !state.counterMode;
+                e.target.innerText = `🛡️ 被せモード: ${state.counterMode ? 'ON' : 'OFF'}`;
+                e.target.classList.toggle('active', state.counterMode);
+            };
+
+            // 連続自動初期配置ボタン
+            document.getElementById('btn-auto-fill').onclick = () => {
+                if (confirm('現在の配置を上書きし、同じ人が連続しないローテーションでプレイヤーを初期配置しますか？')) {
+                    autoFillGroupedPlayers();
+                }
+            };
+
+            // 勝敗リセット
+            document.getElementById('btn-reset-scores').onclick = () => {
+                if (confirm('すべての勝敗結果をクリアしますか？')) {
+                    state.p1Slots.forEach(s => s.result = 'none');
+                    state.p2Slots.forEach(s => s.result = 'none');
+                    renderAll();
+                }
+            };
+        }
+
+        function escapeHtml(str) {
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        // アプリ起動
+        window.onload = initApp;
+    </script>
 </body>
 </html>
