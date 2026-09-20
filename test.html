@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>スパ2X 勝敗管理・星取表</title>
+    <!-- SortableJS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <style>
         :root {
@@ -90,7 +91,7 @@
         .p2-title { background-color: rgba(77, 148, 255, 0.2); color: var(--p2-color); }
 
         .slot-list {
-            min-height: 200px;
+            min-height: 150px;
         }
 
         .slot-card {
@@ -147,19 +148,18 @@
             cursor: pointer;
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 8px;
         }
 
         .char-display:hover { color: #fff; }
 
         .char-icon {
-            width: 24px;
-            height: 24px;
-            border-radius: 3px;
-            background-size: cover;
-            background-position: center;
-            display: inline-block;
-            background-color: #444;
+            width: 32px;
+            height: 32px;
+            border-radius: 4px;
+            object-fit: cover;
+            background-color: #333;
+            border: 1px solid #555;
         }
 
         .slot-actions {
@@ -169,8 +169,8 @@
         }
 
         .btn-action {
-            padding: 3px 6px;
-            font-size: 11px;
+            padding: 4px 8px;
+            font-size: 12px;
             border-radius: 3px;
         }
 
@@ -195,7 +195,7 @@
         }
 
         .bench-list {
-            min-height: 50px;
+            min-height: 40px;
             display: flex;
             flex-direction: column;
             gap: 4px;
@@ -216,17 +216,17 @@
             background-color: var(--palette-bg);
             padding: 15px;
             border-radius: 8px;
-            max-width: 500px;
+            max-width: 520px;
             width: 90%;
             border: 1px solid #555;
         }
 
         .palette-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(5, 1fr);
             gap: 8px;
             margin-top: 10px;
-            max-height: 350px;
+            max-height: 380px;
             overflow-y: auto;
         }
 
@@ -246,14 +246,12 @@
             background: #444;
         }
 
-        .char-item-icon {
+        .char-item img {
             width: 40px;
             height: 40px;
             border-radius: 4px;
+            object-fit: cover;
             margin-bottom: 4px;
-            background-size: cover;
-            background-position: center;
-            background-color: #222;
         }
 
         /* 設定モーダル */
@@ -376,13 +374,12 @@
                         <option value="6" selected>6人 (3vs3)</option>
                         <option value="7">7人 (4vs3)</option>
                         <option value="8">8人 (4vs4)</option>
-                        <option value="9">9人 (5vs4)</option>
-                        <option value="10">10人 (5vs5)</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label>総キャラ数 (合計枠数):</label>
                     <select id="setting-total-slots">
+                        <option value="4">4枠 (2vs2)</option>
                         <option value="6">6枠 (3vs3)</option>
                         <option value="8">8枠 (4vs4)</option>
                         <option value="10">10枠 (5vs5)</option>
@@ -392,7 +389,7 @@
                     </select>
                 </div>
                 <div id="calc-result-info" style="font-size: 12px; color: #aaa; background: #222; padding: 6px; border-radius: 4px;">
-                    計算結果: 1P(3人/各2キャラ) vs 2P(3人/各2キャラ)
+                    計算結果: 1P(3人) vs 2P(3人) | 各チーム 6枠
                 </div>
             </div>
 
@@ -427,26 +424,26 @@
     </div>
 
     <script>
-        // キャラクターマスターデータ (スパ2X 全17キャラ + 未設定)
+        // キャラクターマスターデータ（Google Driveの画像リンク・直リンクURL構造）
         const CHARACTERS = [
-            { id: 'none', name: '未設定', icon: '' },
-            { id: 'ryu', name: 'リュウ', icon: '' },
-            { id: 'ken', name: 'ケン', icon: '' },
-            { id: 'chunli', name: '春麗', icon: '' },
-            { id: 'guile', name: 'ガイル', icon: '' },
-            { id: 'zangief', name: 'ザンギエフ', icon: '' },
-            { id: 'dhalsim', name: 'ダルシム', icon: '' },
-            { id: 'blanca', name: 'ブランカ', icon: '' },
-            { id: 'honda', name: 'エドモンド本田', icon: '' },
-            { id: 'feilong', name: 'フェイロン', icon: '' },
-            { id: 'deejay', name: 'ディージェイ', icon: '' },
-            { id: 'hawk', name: 'T.ホーク', icon: '' },
-            { id: 'cammy', name: 'キャミィ', icon: '' },
-            { id: 'boxer', name: 'バイソン', icon: '' },
-            { id: 'claw', name: 'バルログ', icon: '' },
-            { id: 'sagat', name: 'サガット', icon: '' },
-            { id: 'dictator', name: 'ベガ', icon: '' },
-            { id: 'akuma', name: '豪鬼', icon: '' }
+            { id: 'none', name: '未設定', icon: 'https://drive.google.com/thumbnail?id=1_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X_X&sz=w100' },
+            { id: 'ryu', name: 'リュウ', icon: 'https://drive.google.com/thumbnail?id=1_RYU_DRIVE_LINK_EXAMPLE_ID&sz=w100' },
+            { id: 'ken', name: 'ケン', icon: 'https://drive.google.com/thumbnail?id=1_KEN_DRIVE_LINK_EXAMPLE_ID&sz=w100' },
+            { id: 'chunli', name: '春麗', icon: 'https://drive.google.com/thumbnail?id=1_CHUNLI_DRIVE_LINK_EXAMPLE_ID&sz=w100' },
+            { id: 'guile', name: 'ガイル', icon: 'https://drive.google.com/thumbnail?id=1_GUILE_DRIVE_LINK_EXAMPLE_ID&sz=w100' },
+            { id: 'zangief', name: 'ザンギエフ', icon: 'https://drive.google.com/thumbnail?id=1_ZANGIEF_DRIVE_LINK_EXAMPLE_ID&sz=w100' },
+            { id: 'dhalsim', name: 'ダルシム', icon: 'https://drive.google.com/thumbnail?id=1_DHALSIM_DRIVE_LINK_EXAMPLE_ID&sz=w100' },
+            { id: 'blanca', name: 'ブランカ', icon: 'https://drive.google.com/thumbnail?id=1_BLANCA_DRIVE_LINK_EXAMPLE_ID&sz=w100' },
+            { id: 'honda', name: 'エドモンド本田', icon: 'https://drive.google.com/thumbnail?id=1_HONDA_DRIVE_LINK_EXAMPLE_ID&sz=w100' },
+            { id: 'feilong', name: 'フェイロン', icon: 'https://drive.google.com/thumbnail?id=1_FEILONG_DRIVE_LINK_EXAMPLE_ID&sz=w100' },
+            { id: 'deejay', name: 'ディージェイ', icon: 'https://drive.google.com/thumbnail?id=1_DEEJAY_DRIVE_LINK_EXAMPLE_ID&sz=w100' },
+            { id: 'hawk', name: 'T.ホーク', icon: 'https://drive.google.com/thumbnail?id=1_HAWK_DRIVE_LINK_EXAMPLE_ID&sz=w100' },
+            { id: 'cammy', name: 'キャミィ', icon: 'https://drive.google.com/thumbnail?id=1_CAMMY_DRIVE_LINK_EXAMPLE_ID&sz=w100' },
+            { id: 'boxer', name: 'バイソン', icon: 'https://drive.google.com/thumbnail?id=1_BOXER_DRIVE_LINK_EXAMPLE_ID&sz=w100' },
+            { id: 'claw', name: 'バルログ', icon: 'https://drive.google.com/thumbnail?id=1_CLAW_DRIVE_LINK_EXAMPLE_ID&sz=w100' },
+            { id: 'sagat', name: 'サガット', icon: 'https://drive.google.com/thumbnail?id=1_SAGAT_DRIVE_LINK_EXAMPLE_ID&sz=w100' },
+            { id: 'dictator', name: 'ベガ', icon: 'https://drive.google.com/thumbnail?id=1_DICTATOR_DRIVE_LINK_EXAMPLE_ID&sz=w100' },
+            { id: 'akuma', name: '豪鬼', icon: 'https://drive.google.com/thumbnail?id=1_AKUMA_DRIVE_LINK_EXAMPLE_ID&sz=w100' }
         ];
 
         // アプリケーション全体の状態データ
@@ -479,22 +476,22 @@
             state.p1Slots = [];
             state.p2Slots = [];
             for (let i = 0; i < state.totalSlotsPerTeam; i++) {
-                state.p1Slots.push(createEmptySlot(i));
-                state.p2Slots.push(createEmptySlot(i));
+                state.p1Slots.push(createEmptySlot(i, '1P'));
+                state.p2Slots.push(createEmptySlot(i, '2P'));
             }
         }
 
-        function createEmptySlot(index) {
+        function createEmptySlot(index, teamPrefix) {
             return {
                 id: 'slot_' + Math.random().toString(36).substr(2, 9),
-                playerName: `プレイヤー${index + 1}`,
+                playerName: `${teamPrefix}_P${(index % 3) + 1}`,
                 charId: 'none',
                 isSecret: false,
                 result: 'none' // 'win', 'lose', 'none'
             };
         }
 
-        // --- 設定・配分計算ロジック ---
+        // --- 人数＆枠数計算ロジック ---
 
         function calculateDistribution(totalPlayers, totalSlots) {
             const p1Count = Math.ceil(totalPlayers / 2);
@@ -557,18 +554,11 @@
             const res = calculateDistribution(pCount, tSlots);
 
             function buildRotatedList(players, alloc) {
-                let pool = [];
-                alloc.forEach((count, idx) => {
-                    const name = players[idx] || `P${idx+1}`;
-                    for (let i = 0; i < count; i++) pool.push(name);
-                });
-
-                // A, B, C, A, B, C... と並ぶように配置
-                let result = [];
                 let playerQueues = players.map((p, idx) => {
                     return new Array(alloc[idx]).fill(p);
                 });
 
+                let result = [];
                 let added = true;
                 while (added) {
                     added = false;
@@ -585,9 +575,8 @@
             const p1Order = buildRotatedList(state.p1Players, res.p1Alloc);
             const p2Order = buildRotatedList(state.p2Players, res.p2Alloc);
 
-            // 枠数の更新に伴う調整
             state.totalSlotsPerTeam = res.slotsPerSide;
-            
+
             state.p1Slots = p1Order.map((name, i) => ({
                 id: 'slot_p1_' + i + '_' + Math.random().toString(36).substr(2, 5),
                 playerName: name,
@@ -632,13 +621,14 @@
                 card.dataset.id = slot.id;
 
                 const displayCharName = slot.isSecret ? '???' : charInfo.name;
+                const displayCharIcon = slot.isSecret ? '' : charInfo.icon;
 
                 card.innerHTML = `
                     <div class="slot-index">${index + 1}</div>
                     <div class="slot-info">
                         <input type="text" class="player-name" value="${escapeHtml(slot.playerName)}" data-team="${team}" data-index="${index}">
                         <div class="char-display" onclick="openCharModal('${team}', ${index}, 'slot')">
-                            <span class="char-icon"></span>
+                            ${displayCharIcon ? `<img src="${displayCharIcon}" class="char-icon" alt="${displayCharName}">` : `<div class="char-icon"></div>`}
                             <span>${displayCharName}</span>
                         </div>
                     </div>
@@ -650,7 +640,6 @@
                     </div>
                 `;
 
-                // プレイヤー名のリアルタイム更新処理
                 const nameInput = card.querySelector('.player-name');
                 nameInput.addEventListener('change', (e) => {
                     slots[index].playerName = e.target.value;
@@ -695,7 +684,6 @@
                 if (opponentSlots[index]) opponentSlots[index].result = 'none';
             } else {
                 targetSlots[index].result = resType;
-                // 連動して対戦相手の結果も自動補完
                 if (opponentSlots[index]) {
                     opponentSlots[index].result = resType === 'win' ? 'lose' : 'win';
                 }
@@ -760,7 +748,7 @@
             new Sortable(p2List, options);
         }
 
-        // --- キャラモーダルモーダル制御 ---
+        // --- キャラモーダル制御 ---
 
         function openCharModal(team, index, location) {
             activeTargetSlot = { team, index, location };
@@ -771,7 +759,7 @@
                 const item = document.createElement('div');
                 item.className = 'char-item';
                 item.innerHTML = `
-                    <div class="char-item-icon"></div>
+                    ${char.icon ? `<img src="${char.icon}" alt="${char.name}">` : `<div style="width:40px;height:40px;background:#222;border-radius:4px;margin-bottom:4px;"></div>`}
                     <div style="font-size:11px;">${char.name}</div>
                 `;
                 item.onclick = () => selectCharacter(char.id);
@@ -797,7 +785,6 @@
         // --- イベントリスナー設定 ---
 
         function setupEventListeners() {
-            // モーダル開閉
             document.getElementById('btn-settings').onclick = () => {
                 document.getElementById('setting-player-count').value = state.playerCount;
                 document.getElementById('setting-total-slots').value = state.totalSlotsPerTeam * 2;
@@ -815,11 +802,9 @@
                 document.getElementById('char-modal').style.display = 'none';
             };
 
-            // 設定変更時のリアルタイム計算更新
             document.getElementById('setting-player-count').onchange = updateCalcResultDisplay;
             document.getElementById('setting-total-slots').onchange = updateCalcResultDisplay;
 
-            // 設定保存
             document.getElementById('btn-save-settings').onclick = () => {
                 state.playerCount = parseInt(document.getElementById('setting-player-count').value, 10);
                 const totalSlots = parseInt(document.getElementById('setting-total-slots').value, 10);
@@ -828,29 +813,25 @@
                 state.p1TeamName = document.getElementById('setting-p1-team-name').value;
                 state.p2TeamName = document.getElementById('setting-p2-team-name').value;
 
-                // プレイヤー名取得
                 state.p1Players = Array.from(document.querySelectorAll('.p1-player-input')).map(i => i.value);
                 state.p2Players = Array.from(document.querySelectorAll('.p2-player-input')).map(i => i.value);
 
                 document.getElementById('settings-modal').style.display = 'none';
-                autoFillGroupedPlayers(); // 設定変更時に自動連続初期配置を適用
+                autoFillGroupedPlayers();
             };
 
-            // 被せモード切り替え
             document.getElementById('btn-counter-mode').onclick = (e) => {
                 state.counterMode = !state.counterMode;
                 e.target.innerText = `🛡️ 被せモード: ${state.counterMode ? 'ON' : 'OFF'}`;
                 e.target.classList.toggle('active', state.counterMode);
             };
 
-            // 連続自動初期配置ボタン
             document.getElementById('btn-auto-fill').onclick = () => {
-                if (confirm('現在の配置を上書きし、同じ人が連続しないローテーションでプレイヤーを初期配置しますか？')) {
+                if (confirm('現在の配置を上書きし、同一人物が連続しないローテーションで初期配置しますか？')) {
                     autoFillGroupedPlayers();
                 }
             };
 
-            // 勝敗リセット
             document.getElementById('btn-reset-scores').onclick = () => {
                 if (confirm('すべての勝敗結果をクリアしますか？')) {
                     state.p1Slots.forEach(s => s.result = 'none');
@@ -864,7 +845,6 @@
             return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         }
 
-        // アプリ起動
         window.onload = initApp;
     </script>
 </body>
