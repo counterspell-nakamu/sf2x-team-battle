@@ -314,7 +314,7 @@
       <summary class="admin-summary">
         <span>▼ ⚙️ 管理操作パネル</span>
 
-        <!-- 一番右上（ヘッダー内）へ移動したルーム表示＆切り替え機能 -->
+        <!-- 一番右上（ヘッダー内）のルーム表示＆切り替え機能 -->
         <div class="room-header-controls" onclick="event.stopPropagation();">
           <span>🏠 現在のルーム: <strong id="currentRoomDisplay" style="color:#ff9f1c; font-size:1.1em;">default</strong></span>
           <input type="text" id="roomInput" placeholder="部屋名" style="width:140px; padding:3px 6px;">
@@ -345,16 +345,11 @@
 
           <div>
             <h3>2. オーダー＆キャラ設定</h3>
-            <!-- 対戦枠数（キャラ数）選択機能の追加 -->
+            <!-- 対戦枠数（2〜16枠）選択機能 -->
             <div style="margin-bottom:8px; display:flex; align-items:center; gap:8px; background:#111118; padding:6px 8px; border-radius:6px;">
               <label for="slotCountSelect" style="font-weight:bold; font-size:0.9em;">🎯 対戦枠数 (キャラ数):</label>
               <select id="slotCountSelect" onchange="changeSlotCount(this.value)" style="padding:3px 6px;">
-                <option value="5">5枠 (5キャラ戦)</option>
-                <option value="7">7枠 (7キャラ戦)</option>
-                <option value="10">10枠 (10キャラ戦)</option>
-                <option value="12">12枠 (12キャラ戦)</option>
-                <option value="15">15枠 (15キャラ戦)</option>
-                <option value="16" selected>16枠 (16キャラ戦)</option>
+                <!-- JavaScriptで2〜16枠を動的に生成 -->
               </select>
             </div>
 
@@ -433,7 +428,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// --- ルーム（部屋）機能の追加 ---
+// --- ルーム（部屋）機能 ---
 const urlParams = new URLSearchParams(window.location.search);
 let currentRoom = urlParams.get('room') || 'default';
 
@@ -442,8 +437,11 @@ const allCharacters = baseChars.map((name, i) => ({
   id: `x_${i}`, name: `X ${name}`, icon: `image/x_${i}.png`
 }));
 
+// 初期名簿プレイヤーを設定
+const defaultPlayers = ["ウメハラ", "ヌキ", "ハイタニ", "サコー", "ナカム～", "ぐっち", "こたか", "サシシ"];
+
 let appState = {
-  masterPlayers: ["ウメハラ", "ヌキ", "ハイタニ", "サコー", "ナカム～", "ぐっち", "こたか", "サシシ"],
+  masterPlayers: [...defaultPlayers],
   team1Members: [],
   team2Members: [],
   team1Orders: { match: [], bench: [] },
@@ -458,6 +456,7 @@ let sortableInstance = null;
 let activeCharTargetInput = null;
 
 window.onload = function() {
+  initSlotSelectOptions();
   initCharPalette();
   
   // ルーム名表示更新
@@ -470,6 +469,9 @@ window.onload = function() {
     if (data) {
       appState = data;
       if (!appState.slotCount) appState.slotCount = 16;
+      if (!appState.masterPlayers || appState.masterPlayers.length === 0) {
+        appState.masterPlayers = [...defaultPlayers];
+      }
       if (Array.isArray(appState.team1Orders)) {
         appState.team1Orders = { match: appState.team1Orders, bench: [] };
       }
@@ -492,6 +494,19 @@ window.onload = function() {
     }
   });
 };
+
+// 2〜16の選択肢を動的生成
+function initSlotSelectOptions() {
+  const select = document.getElementById("slotCountSelect");
+  select.innerHTML = "";
+  for (let i = 2; i <= 16; i++) {
+    const opt = document.createElement("option");
+    opt.value = i;
+    opt.textContent = `${i}枠 (${i}キャラ戦)`;
+    if (i === 16) opt.selected = true;
+    select.appendChild(opt);
+  }
+}
 
 function syncToFirebase() {
   db.ref(`sf2x_rooms/${currentRoom}`).set(appState);
@@ -585,7 +600,7 @@ function renderMasterChecklist() {
   const container = document.getElementById("masterChecklist");
   if (!container) return;
   container.innerHTML = "";
-  if (!appState.masterPlayers) appState.masterPlayers = [];
+  if (!appState.masterPlayers) appState.masterPlayers = [...defaultPlayers];
   
   appState.masterPlayers.forEach((p, idx) => {
     const item = document.createElement("div");
