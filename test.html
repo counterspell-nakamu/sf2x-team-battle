@@ -338,7 +338,7 @@
   <script>
     // --- アプリケーション状態管理 ---
     let state = {
-      maxSlots: 16, // 各チームのデフォルト枠数 (16枠)
+      maxSlots: 16, // 各チームのデフォルト枠数
       room: 'default',
       playersMaster: ['サコー', 'ナカム〜', 'ぐっち', 'こたか', 'サシシ'],
       p1Team: [],
@@ -379,6 +379,11 @@
         }
       });
 
+      // 自動振り分けボタンの処理
+      document.getElementById('btn-auto-assign').addEventListener('click', () => {
+        autoAssignCheckedPlayers();
+      });
+
       // 部屋移動ボタン
       document.getElementById('btn-change-room').addEventListener('click', () => {
         const roomVal = document.getElementById('room-input').value.trim();
@@ -389,9 +394,56 @@
       });
     }
 
+    // チェックされたプレイヤーを1P/2Pにランダム自動振り分け
+    function autoAssignCheckedPlayers() {
+      const checkedNames = [];
+      state.playersMaster.forEach((name, idx) => {
+        const chk = document.getElementById(`p-check-${idx}`);
+        if (chk && chk.checked) {
+          checkedNames.push(name);
+        }
+      });
+
+      if (checkedNames.length === 0) {
+        alert('振り分けるプレイヤーにチェックを入れてください。');
+        return;
+      }
+
+      // シャッフル (Fisher-Yates)
+      for (let i = checkedNames.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [checkedNames[i], checkedNames[j]] = [checkedNames[j], checkedNames[i]];
+      }
+
+      // クリア
+      state.p1Team = [];
+      state.p2Team = [];
+      state.p1Bench = [];
+      state.p2Bench = [];
+
+      // 交互に1P, 2Pへ割り振る（設定された枠数を超えた分はベンチへ）
+      checkedNames.forEach((name, index) => {
+        const playerObj = { name: name, char: '' };
+        if (index % 2 === 0) {
+          if (state.p1Team.length < state.maxSlots) {
+            state.p1Team.push(playerObj);
+          } else {
+            state.p1Bench.push(playerObj);
+          }
+        } else {
+          if (state.p2Team.length < state.maxSlots) {
+            state.p2Team.push(playerObj);
+          } else {
+            state.p2Bench.push(playerObj);
+          }
+        }
+      });
+
+      renderAll();
+    }
+
     // 枠数の変化に応じて現在のスロット数を調整する
     function adjustSlotsToMax() {
-      // 溢れたプレイヤーはベンチへ移動
       while (state.p1Team.length > state.maxSlots) {
         state.p1Bench.push(state.p1Team.pop());
       }
@@ -403,12 +455,22 @@
     // マスタープレイヤータグの描画
     function renderMasterPlayers() {
       const container = document.getElementById('player-tags-container');
+      // チェック状態を保持
+      const currentCheckedState = {};
+      state.playersMaster.forEach((_, idx) => {
+        const chk = document.getElementById(`p-check-${idx}`);
+        if (chk) {
+          currentCheckedState[idx] = chk.checked;
+        }
+      });
+
       container.innerHTML = '';
       state.playersMaster.forEach((name, idx) => {
+        const isChecked = currentCheckedState[idx] !== undefined ? currentCheckedState[idx] : true;
         const tag = document.createElement('div');
         tag.className = 'player-tag';
         tag.innerHTML = `
-          <input type="checkbox" id="p-check-${idx}" checked>
+          <input type="checkbox" id="p-check-${idx}" ${isChecked ? 'checked' : ''}>
           <label for="p-check-${idx}">${escapeHtml(name)}</label>
           <span class="tag-remove" onclick="removeMasterPlayer(${idx})">×</span>
         `;
