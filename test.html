@@ -2,276 +2,968 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>スパ2X チームオーダー管理・OBS配信ツール</title>
-    <!-- SortableJS CDN -->
+    <title>スパ2X チーム管理・対戦オーダートラッカー</title>
+    <!-- Firebase SDK (Compat) -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <!-- SortableJS (for Drag & Drop) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <style>
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --card-border: #333;
+            --text-color: #e0e0e0;
+            --text-muted: #888;
+            --accent-red: #d32f2f;
+            --accent-blue: #1976d2;
+            --accent-green: #388e3c;
+            --accent-orange: #f57c00;
+            --hover-bg: #2a2a2a;
+        }
+
         body {
-            font-family: sans-serif;
-            background: #121212;
-            color: #e0e0e0;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
             margin: 0;
             padding: 20px;
         }
-        h1, h2 {
-            color: #fff;
+
+        h1, h2, h3 {
+            margin-top: 0;
         }
+
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
         }
-        .section {
-            background: #1e1e1e;
-            border: 1px solid #333;
-            padding: 20px;
-            margin-bottom: 20px;
+
+        /* 画面上部コントロールパネル */
+        .control-panel {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            padding: 15px 20px;
             border-radius: 8px;
-        }
-        button {
-            background: #333;
-            color: #fff;
-            border: 1px solid #555;
-            padding: 8px 16px;
-            margin: 4px;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        button:hover {
-            background: #444;
-        }
-        input[type="text"] {
-            background: #2a2a2a;
-            border: 1px solid #444;
-            color: #fff;
-            padding: 6px;
-            border-radius: 4px;
-        }
-        .player-list {
+            margin-bottom: 20px;
             display: flex;
             flex-wrap: wrap;
-            gap: 8px;
-            min-height: 50px;
-            background: #252525;
-            padding: 10px;
-            border-radius: 4px;
-            margin-bottom: 10px;
-        }
-        .player-chip {
-            background: #333;
-            border: 1px solid #666;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: grab;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .player-chip:active {
-            cursor: grabbing;
-        }
-        .team-container {
-            display: flex;
-            gap: 20px;
-            flex-wrap: wrap;
-        }
-        .team-box {
-            flex: 1;
-            min-width: 300px;
-            background: #252525;
-            border: 1px solid #444;
-            padding: 15px;
-            border-radius: 6px;
-        }
-        /* カード裏返し（隠し）用スタイル */
-        .card-slot {
-            background: #2a2a2a;
-            border: 2px dashed #555;
-            padding: 10px;
-            margin-bottom: 8px;
-            border-radius: 4px;
-            min-height: 40px;
-            display: flex;
+            gap: 15px;
             align-items: center;
             justify-content: space-between;
         }
-        .card-slot.hidden .card-content {
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        input[type="text"], select {
+            background: #2c2c2c;
+            border: 1px solid #444;
+            color: var(--text-color);
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        button {
+            background: #333;
+            border: 1px solid #555;
+            color: var(--text-color);
+            padding: 6px 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #444;
+        }
+
+        button.primary {
+            background: var(--accent-blue);
+            border-color: #115293;
+        }
+        button.primary:hover {
+            background: #115293;
+        }
+
+        button.danger {
+            background: var(--accent-red);
+            border-color: #9a0007;
+        }
+        button.danger:hover {
+            background: #9a0007;
+        }
+
+        button.success {
+            background: var(--accent-green);
+            border-color: #1b5e20;
+        }
+        button.success:hover {
+            background: #1b5e20;
+        }
+
+        /* メインレイアウト：2カラム構成 */
+        .main-layout {
+            display: grid;
+            grid-template-columns: 1fr 340px;
+            gap: 20px;
+        }
+
+        @media (max-width: 1100px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* チーム管理エリア */
+        .teams-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 800px) {
+            .teams-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .team-box {
+            background: var(--card-bg);
+            border: 2px solid var(--card-border);
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .team-box.red-team {
+            border-color: rgba(211, 47, 47, 0.4);
+        }
+        .team-box.blue-team {
+            border-color: rgba(25, 118, 210, 0.4);
+        }
+
+        .team-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 8px;
+        }
+
+        .team-header input[type="text"] {
+            font-size: 16px;
+            font-weight: bold;
+            width: 130px;
+        }
+
+        .order-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            min-height: 250px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        /* プレイヤーカード（オーダー枠） */
+        .player-item {
+            background: #252525;
+            border: 1px solid #3a3a3a;
+            border-radius: 6px;
+            padding: 8px 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: grab;
+            transition: background 0.2s, border-color 0.2s;
+        }
+
+        .player-item:active {
+            cursor: grabbing;
+        }
+
+        .player-item.sortable-ghost {
+            opacity: 0.4;
+            background: #444;
+        }
+
+        .slot-number {
+            font-size: 13px;
+            font-weight: bold;
+            color: var(--text-muted);
+            min-width: 20px;
+            text-align: center;
+        }
+
+        .char-icon-preview {
+            width: 36px;
+            height: 36px;
+            background: #111;
+            border: 1px solid #444;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: #aaa;
+            cursor: pointer;
+            overflow: hidden;
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        .char-icon-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .player-name-input {
+            flex-grow: 1;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            color: var(--text-color);
+            padding: 5px 8px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .player-name-input:focus {
+            border-color: var(--accent-blue);
+            outline: none;
+        }
+
+        /* 右側：キャラクターパレット（選択用） */
+        .sidebar {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            height: fit-content;
+        }
+
+        .char-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+
+        .char-palette-item {
+            background: #252525;
+            border: 1px solid #444;
+            border-radius: 6px;
+            padding: 6px 4px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.15s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .char-palette-item:hover {
+            background: var(--hover-bg);
+            border-color: #666;
+            transform: translateY(-2px);
+        }
+
+        .char-palette-item img {
+            width: 40px;
+            height: 40px;
+            object-fit: cover;
+            border-radius: 4px;
+            background: #111;
+        }
+
+        .char-palette-name {
+            font-size: 11px;
+            color: #ccc;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            width: 100%;
+        }
+
+        /* ステータス表示・接続インジケーター */
+        .status-bar {
+            margin-top: 15px;
+            font-size: 12px;
+            color: var(--text-muted);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .connection-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #f44336;
+            margin-right: 5px;
+        }
+        .connection-indicator.online {
+            background: #4caf50;
+        }
+
+        /* モーダルダイアログ */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
             display: none;
         }
-        .card-slot.hidden::after {
-            content: "【 裏返し（非公開） 】";
-            color: #888;
+
+        .modal-content {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 20px;
+            width: 380px;
+            max-width: 90%;
+        }
+
+        .modal-header {
+            font-size: 16px;
             font-weight: bold;
-            letter-spacing: 2px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .modal-char-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            max-height: 300px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        /* ユーティリティ */
+        .hidden {
+            display: none !important;
+        }
+        
+        .badge {
+            font-size: 11px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            background: #333;
+            color: #aaa;
         }
     </style>
 </head>
 <body>
-<div class="container">
-    <h1>スパ2X チームオーダー管理・OBS配信ツール</h1>
 
-    <!-- プレイヤー登録セクション -->
-    <div class="section">
-        <h2>プレイヤー登録</h2>
-        <div>
-            <input type="text" id="newPlayerName" placeholder="プレイヤー名を入力">
-            <button id="addPlayerBtn">追加</button>
-            <button id="clearPlayersBtn">全員クリア</button>
+<div class="container">
+    <!-- 上部コントロールパネル -->
+    <div class="control-panel">
+        <div class="control-group">
+            <h2>スパ2X チーム管理・対戦オーダートラッカー</h2>
         </div>
-        <div id="registeredPlayers" class="player-list">
-            <!-- プレイヤーチップがここに入ります -->
+        <div class="control-group">
+            <label for="room-id-input">ルームID:</label>
+            <input type="text" id="room-id-input" value="default-room" style="width: 120px;">
+            <button id="room-connect-btn" class="primary">接続 / 切替</button>
+        </div>
+        <div class="control-group">
+            <label for="mode-select">操作モード:</label>
+            <select id="mode-select">
+                <option value="all">全体操作 (全編集可)</option>
+                <option value="red">赤チーム専用</option>
+                <option value="blue">青チーム専用</option>
+                <option value="obs">OBS表示用 (閲覧のみ)</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label for="slot-count-select">対戦枠数:</label>
+            <select id="slot-count-select">
+                <option value="2">2人</option>
+                <option value="3">3人</option>
+                <option value="4">4人</option>
+                <option value="5" selected>5人</option>
+                <option value="6">6人</option>
+                <option value="7">7人</option>
+                <option value="8">8人</option>
+                <option value="10">10人</option>
+                <option value="12">12人</option>
+                <option value="16">16人</option>
+            </select>
         </div>
     </div>
 
-    <!-- チーム分け・オーダー設定セクション -->
-    <div class="section">
-        <h2>チームオーダー設定</h2>
-        <div style="margin-bottom: 10px;">
-            <button id="shuffleRandomBtn">完全前ランダム（裏返しシャッフル）</button>
-            <button id="toggleRevealBtn">全体めくる / 隠す</button>
-        </div>
-        
-        <div class="team-container">
-            <!-- チームA -->
-            <div class="team-box">
-                <h3>チーム A</h3>
-                <div id="teamA-slots">
-                    <!-- スロットが動的に生成されます -->
+    <!-- メインレイアウト -->
+    <div class="main-layout">
+        <!-- チーム管理エリア（左右） -->
+        <div class="teams-container">
+            <!-- 赤チーム (Team Red) -->
+            <div class="team-box red-team" id="team-red-box">
+                <div class="team-header">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <input type="text" id="team-red-name" value="赤チーム" class="team-name-input">
+                        <span class="badge" id="red-count">5人</span>
+                    </div>
+                    <div style="display: flex; gap: 5px;">
+                        <button id="red-shuffle-btn" class="team-action-btn" title="ランダムにシャッフル">🔀 シャッフル</button>
+                        <button id="red-clear-btn" class="team-action-btn danger" title="クリア">クリア</button>
+                    </div>
                 </div>
+                <ul id="red-order-list" class="order-list" data-team="red">
+                    <!-- 動的生成されるプレイヤー枠 -->
+                </ul>
             </div>
-            <!-- チームB -->
-            <div class="team-box">
-                <h3>チーム B</h3>
-                <div id="teamB-slots">
-                    <!-- スロットが動的に生成されます -->
+
+            <!-- 青チーム (Team Blue) -->
+            <div class="team-box blue-team" id="team-blue-box">
+                <div class="team-header">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <input type="text" id="team-blue-name" value="青チーム" class="team-name-input">
+                        <span class="badge" id="blue-count">5人</span>
+                    </div>
+                    <div style="display: flex; gap: 5px;">
+                        <button id="blue-shuffle-btn" class="team-action-btn" title="ランダムにシャッフル">🔀 シャッフル</button>
+                        <button id="blue-clear-btn" class="team-action-btn danger" title="クリア">クリア</button>
+                    </div>
+                </div>
+                <ul id="blue-order-list" class="order-list" data-team="blue">
+                    <!-- 動的生成されるプレイヤー枠 -->
+                </ul>
+            </div>
+        </div>
+
+        <!-- サイドバー：キャラクターパレット -->
+        <div class="sidebar" id="sidebar-panel">
+            <h3>キャラクターパレット</h3>
+            <p style="font-size: 12px; color: var(--text-muted); margin: 0 0 10px 0;">
+                アイコンをクリックするか、枠にドラッグ＆ドロップしてキャラ変更。
+            </p>
+            <div class="char-grid" id="char-palette-grid">
+                <!-- 動的生成 -->
+            </div>
+
+            <div class="status-bar">
+                <div>
+                    <span class="connection-indicator" id="connection-indicator"></span>
+                    <span id="connection-status-text">未接続</span>
+                </div>
+                <div>
+                    <button id="reset-all-btn" class="danger" style="font-size: 11px; padding: 3px 8px;">全リセット</button>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
+<!-- キャラクター選択モーダル -->
+<div class="modal-overlay" id="char-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span>キャラクター選択</span>
+            <button class="modal-close" id="modal-close-btn">&times;</button>
+        </div>
+        <div class="modal-char-grid" id="modal-char-grid">
+            <!-- 動的生成 -->
+        </div>
+    </div>
+</div>
+
 <script>
-    // 状態管理
-    let players = [];
-    let teamASlots = ['', '', '', '', ''];
-    let teamBSlots = ['', '', '', '', ''];
-    let isAllHidden = true; // 初期状態は裏返し（非公開）
+    // --- キャラクター定義 (スパ2X 全17キャラ + ランダム等) ---
+    const CHARACTERS = [
+        { id: 'ryu', name: 'リュウ', icon: 'https://www.fightersgeneration.com/characters2/ryu/ssf2thd-ryu-head.gif' },
+        { id: 'ken', name: 'ケン', icon: 'https://www.fightersgeneration.com/characters2/ken/ssf2thd-ken-head.gif' },
+        { id: 'chunli', name: '春麗', icon: 'https://www.fightersgeneration.com/characters2/chunli/ssf2thd-chunli-head.gif' },
+        { id: 'guile', name: 'ガイル', icon: 'https://www.fightersgeneration.com/characters2/guile/ssf2thd-guile-head.gif' },
+        { id: 'ehonda', name: 'E.本田', icon: 'https://www.fightersgeneration.com/characters2/ehonda/ssf2thd-ehonda-head.gif' },
+        { id: 'blanka', name: 'ブランカ', icon: 'https://www.fightersgeneration.com/characters2/blanka/ssf2thd-blanka-head.gif' },
+        { id: 'zangief', name: 'ザンギエフ', icon: 'https://www.fightersgeneration.com/characters2/zangief/ssf2thd-zangief-head.gif' },
+        { id: 'dhalsim', name: 'ダルシム', icon: 'https://www.fightersgeneration.com/characters2/dhalsim/ssf2thd-dhalsim-head.gif' },
+        { id: 'bison', name: 'バイソン', icon: 'https://www.fightersgeneration.com/characters2/bison/ssf2thd-boxer-head.gif' },
+        { id: 'balrog', name: 'バルログ', icon: 'https://www.fightersgeneration.com/characters2/balrog/ssf2thd-claw-head.gif' },
+        { id: 'sagat', name: 'サガット', icon: 'https://www.fightersgeneration.com/characters2/sagat/ssf2thd-sagat-head.gif' },
+        { id: 'dictator', name: 'ベガ', icon: 'https://www.fightersgeneration.com/characters2/dictator/ssf2thd-dictator-head.gif' },
+        { id: 'cammy', name: 'キャミィ', icon: 'https://www.fightersgeneration.com/characters2/cammy/ssf2thd-cammy-head.gif' },
+        { id: 'feilong', name: 'フェイロン', icon: 'https://www.fightersgeneration.com/characters2/feilong/ssf2thd-feilong-head.gif' },
+        { id: 'thawk', name: 'T.ホーク', icon: 'https://www.fightersgeneration.com/characters2/thawk/ssf2thd-thawk-head.gif' },
+        { id: 'deejay', name: 'ディージェイ', icon: 'https://www.fightersgeneration.com/characters2/deejay/ssf2thd-deejay-head.gif' },
+        { id: 'akuma', name: '豪鬼', icon: 'https://www.fightersgeneration.com/characters2/akuma/ssf2thd-akuma-head.gif' },
+        { id: 'random', name: 'ランダム', icon: '' }
+    ];
 
-    const nameInput = document.getElementById('newPlayerName');
-    const addBtn = document.getElementById('addPlayerBtn');
-    const clearBtn = document.getElementById('clearPlayersBtn');
-    const playersContainer = document.getElementById('registeredPlayers');
-    const shuffleBtn = document.getElementById('shuffleRandomBtn');
-    const toggleRevealBtn = document.getElementById('toggleRevealBtn');
-    
-    const teamAContainer = document.getElementById('teamA-slots');
-    const teamBContainer = document.getElementById('teamB-slots');
+    const CHAR_MAP = {};
+    CHARACTERS.forEach(c => CHAR_MAP[c.id] = c);
 
-    // 初期描画
-    function init() {
-        renderPlayers();
-        renderTeams();
-    }
-
-    // プレイヤー追加
-    function addPlayer() {
-        const name = nameInput.value.trim();
-        if (name && !players.includes(name)) {
-            players.push(name);
-            nameInput.value = '';
-            renderPlayers();
-        }
-    }
-
-    addBtn.addEventListener('click', addPlayer);
-    nameInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') addPlayer();
-    });
-
-    clearBtn.addEventListener('click', () => {
-        players = [];
-        renderPlayers();
-    });
-
-    // 登録プレイヤー一覧の描画
-    function renderPlayers() {
-        playersContainer.innerHTML = '';
-        players.forEach((player, index) => {
-            const chip = document.createElement('div');
-            chip.className = 'player-chip';
-            chip.innerHTML = `<span>${player}</span> <button style="padding:2px 6px; font-size:10px;" onclick="removePlayer(${index})">×</button>`;
-            playersContainer.appendChild(chip);
-        });
-    }
-
-    window.removePlayer = function(index) {
-        players.splice(index, 1);
-        renderPlayers();
+    // --- Firebase 設定 (匿名簡易接続用パブリック設定) ---
+    const firebaseConfig = {
+        databaseURL: "https://ssf2x-tracker-default-rtdb.firebaseio.com/"
     };
 
-    // チームスロットの描画
-    function renderTeams() {
-        teamAContainer.innerHTML = '';
-        teamBSlots = teamBSlots || ['', '', '', '', '']; // 安全策
+    let db = null;
+    let roomRef = null;
+    let isConnected = false;
+    let currentRoomId = "default-room";
 
-        // チームAの描画
-        teamASlots.forEach((pName, idx) => {
-            teamAContainer.appendChild(createSlotElement('A', idx, pName));
-        });
+    // ローカル状態管理
+    let state = {
+        meta: { slotCount: 5 },
+        red: { name: "赤チーム", players: [] },
+        blue: { name: "青チーム", players: [] }
+    };
 
-        // チームBの描画
-        teamBSlots.forEach((pName, idx) => {
-            teamBContainer.appendChild(createSlotElement('B', idx, pName));
+    let sortableRed = null;
+    let sortableBlue = null;
+    let activeModalTarget = null; // { team, index }
+    let isRemoteUpdating = false;
+
+    // --- 初期化処理 ---
+    window.addEventListener('DOMContentLoaded', () => {
+        initFirebase();
+        initPalette();
+        initEventListeners();
+        initSortable();
+        updateUI();
+    });
+
+    function initFirebase() {
+        try {
+            if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+            }
+            db = firebase.database();
+            setupRoom(document.getElementById('room-id-input').value.trim());
+        } catch (e) {
+            console.error("Firebase Initialization Error:", e);
+            setConnectionStatus(false, "接続エラー");
+        }
+    }
+
+    function setupRoom(roomId) {
+        if (!db) return;
+        if (roomRef) {
+            roomRef.off();
+        }
+        currentRoomId = roomId || "default-room";
+        roomRef = db.ref('rooms/' + currentRoomId);
+
+        setConnectionStatus(false, "接続中...");
+
+        roomRef.on('value', (snapshot) => {
+            const val = snapshot.val();
+            if (val) {
+                isRemoteUpdating = true;
+                state = val;
+                // 不足プロパティの補正
+                if (!state.meta) state.meta = { slotCount: 5 };
+                if (!state.red) state.red = { name: "赤チーム", players: [] };
+                if (!state.blue) state.blue = { name: "青チーム", players: [] };
+                
+                ensurePlayerSlots('red', state.meta.slotCount);
+                ensurePlayerSlots('blue', state.meta.slotCount);
+                
+                updateUI();
+                isRemoteUpdating = false;
+            } else {
+                // ルームが空の場合は初期データを書き込む
+                initDefaultState();
+                saveState();
+            }
+            setConnectionStatus(true, "接続完了 (" + currentRoomId + ")");
+        }, (error) => {
+            console.error("Firebase Read Error:", error);
+            setConnectionStatus(false, "同期エラー");
         });
     }
 
-    function createSlotElement(team, idx, pName) {
-        const slot = document.createElement('div');
-        slot.className = `card-slot ${isAllHidden ? 'hidden' : ''}`;
-        
-        const content = document.createElement('div');
-        content.className = 'card-content';
-        content.textContent = `${idx + 1}将: ${pName || '（未配置）'}`;
-
-        slot.appendChild(content);
-        return slot;
+    function initDefaultState() {
+        const slotCount = parseInt(document.getElementById('slot-count-select').value) || 5;
+        state.meta = { slotCount: slotCount };
+        state.red = { name: "赤チーム", players: createEmptyPlayers(slotCount) };
+        state.blue = { name: "青チーム", players: createEmptyPlayers(slotCount) };
     }
 
-    // 裏返しのまま完全ランダムシャッフル
-    shuffleBtn.addEventListener('click', () => {
-        // 登録されている全プレイヤーをシャッフル用に複製
-        let allPool = [...players];
+    function createEmptyPlayers(count) {
+        const players = [];
+        for (let i = 0; i < count; i++) {
+            players.push({ name: "", char: "ryu" });
+        }
+        return players;
+    }
+
+    function ensurePlayerSlots(teamKey, count) {
+        if (!state[teamKey].players) {
+            state[teamKey].players = [];
+        }
+        while (state[teamKey].players.length < count) {
+            state[teamKey].players.push({ name: "", char: "ryu" });
+        }
+        if (state[teamKey].players.length > count) {
+            state[teamKey].players = state[teamKey].players.slice(0, count);
+        }
+    }
+
+    function saveState() {
+        if (!roomRef || isRemoteUpdating) return;
+        roomRef.set(state).catch(err => {
+            console.error("Firebase Save Error:", err);
+        });
+    }
+
+    // --- パレット・モーダル初期化 ---
+    function initPalette() {
+        const paletteGrid = document.getElementById('char-palette-grid');
+        const modalGrid = document.getElementById('modal-char-grid');
+        paletteGrid.innerHTML = '';
+        modalGrid.innerHTML = '';
+
+        CHARACTERS.forEach(c => {
+            // サイドバーパレット用（クリックで変更対象に適用 or ドラッグ用）
+            const pItem = document.createElement('div');
+            pItem.className = 'char-palette-item';
+            pItem.draggable = true;
+            pItem.dataset.charId = c.id;
+            pItem.innerHTML = `
+                <img src="${c.icon || 'https://via.placeholder.com/40?text=?'}" alt="${c.name}" onerror="this.src='https://via.placeholder.com/40?text=?'">
+                <span class="char-palette-name">${c.name}</span>
+            `;
+            // ドラッグ開始イベント
+            pItem.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'palette-char', charId: c.id }));
+            });
+            paletteGrid.appendChild(pItem);
+
+            // モーダル用
+            const mItem = document.createElement('div');
+            mItem.className = 'char-palette-item';
+            mItem.innerHTML = `
+                <img src="${c.icon || 'https://via.placeholder.com/40?text=?'}" alt="${c.name}" onerror="this.src='https://via.placeholder.com/40?text=?'">
+                <span class="char-palette-name">${c.name}</span>
+            `;
+            mItem.addEventListener('click', () => {
+                if (activeModalTarget) {
+                    const { team, index } = activeModalTarget;
+                    state[team].players[index].char = c.id;
+                    saveState();
+                    updateUI();
+                    closeModal();
+                }
+            });
+            modalGrid.appendChild(mItem);
+        });
+    }
+
+    // --- SortableJS 設定 ---
+    function initSortable() {
+        const redList = document.getElementById('red-order-list');
+        const blueList = document.getElementById('blue-order-list');
+
+        const sortableOptions = {
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            onEnd: (evt) => {
+                if (isRemoteUpdating) return;
+                const teamKey = evt.to.dataset.team;
+                const fromTeamKey = evt.from.dataset.team;
+
+                // DOMから新しい並び順を抽出してstateに反映
+                const items = evt.to.children;
+                const newPlayers = [];
+                for (let i = 0; i < items.length; i++) {
+                    const index = parseInt(items[i].dataset.index);
+                    // 異動元・異動先のstateからデータを取得するが、DOM再構築前の一時的なズレを防ぐため
+                    // 一旦現在のDOM構造に紐づくインデックスのデータを集める
+                }
+                
+                // より確実にDOMの並び順からstateを再構築する
+                syncDOMToState('red');
+                syncDOMToState('blue');
+                saveState();
+                updateUI();
+            }
+        };
+
+        sortableRed = Sortable.create(redList, sortableOptions);
+        sortableBlue = Sortable.create(blueList, sortableOptions);
+    }
+
+    function syncDOMToState(teamKey) {
+        const listEl = document.getElementById(`${teamKey}-order-list`);
+        const itemEls = listEl.children;
+        const newPlayers = [];
+        for (let i = 0; i < itemEls.length; i++) {
+            const oldIdx = parseInt(itemEls[i].dataset.index);
+            if (!isNaN(oldIdx) && state[teamKey].players[oldIdx]) {
+                newPlayers.push(state[teamKey].players[oldIdx]);
+            }
+        }
+        if (newPlayers.length === state[teamKey].players.length) {
+            state[teamKey].players = newPlayers;
+        }
+    }
+
+    // --- イベントリスナー設定 ---
+    function initEventListeners() {
+        // ルーム接続ボタン
+        document.getElementById('room-connect-btn').addEventListener('click', () => {
+            const roomId = document.getElementById('room-id-input').value.trim();
+            if (roomId) {
+                setupRoom(roomId);
+            }
+        });
+
+        // チーム名変更
+        document.getElementById('team-red-name').addEventListener('input', (e) => {
+            state.red.name = e.target.value;
+            saveState();
+        });
+        document.getElementById('team-blue-name').addEventListener('input', (e) => {
+            state.blue.name = e.target.value;
+            saveState();
+        });
+
+        // 対戦枠数変更
+        document.getElementById('slot-count-select').addEventListener('change', (e) => {
+            const count = parseInt(e.target.value);
+            state.meta.slotCount = count;
+            ensurePlayerSlots('red', count);
+            ensurePlayerSlots('blue', count);
+            saveState();
+            updateUI();
+        });
+
+        // 操作モード変更
+        document.getElementById('mode-select').addEventListener('change', (e) => {
+            applyMode(e.target.value);
+        });
+
+        // シャッフル・クリアボタン
+        document.getElementById('red-shuffle-btn').addEventListener('click', () => shuffleTeam('red'));
+        document.getElementById('blue-shuffle-btn').addEventListener('click', () => shuffleTeam('blue'));
+        document.getElementById('red-clear-btn').addEventListener('click', () => clearTeam('red'));
+        document.getElementById('blue-clear-btn').addEventListener('click', () => clearTeam('blue'));
+
+        // 全リセット
+        document.getElementById('reset-all-btn').addEventListener('click', () => {
+            if (confirm("すべてのチーム情報とオーダーをリセットしますか？")) {
+                initDefaultState();
+                saveState();
+                updateUI();
+            }
+        });
+
+        // モーダル閉じる
+        document.getElementById('modal-close-btn').addEventListener('click', closeModal);
+        document.getElementById('char-modal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) closeModal();
+        });
+    }
+
+    // --- UI更新処理 ---
+    function updateUI() {
+        if (!state.meta) state.meta = { slotCount: 5 };
         
-        // シャッフルアルゴリズム (Fisher-Yates)
-        for (let i = allPool.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [allPool[i], allPool[j]] = [allPool[j], allPool[i]];
+        // 枠数セレクトボックスの同期
+        const slotSelect = document.getElementById('slot-count-select');
+        if (slotSelect.value != state.meta.slotCount) {
+            slotSelect.value = state.meta.slotCount;
         }
 
-        // チームAとチームBに振り分け（例：交互、または前半後半など。ここでは5人ずつまたはプール数に応じて分配）
-        const half = Math.ceil(allPool.length / 2);
-        teamASlots = allPool.slice(0, 5);
-        teamBSlots = allPool.slice(5, 10);
+        // チーム名同期
+        const redNameInput = document.getElementById('team-red-name');
+        if (document.activeElement !== redNameInput) {
+            redNameInput.value = state.red.name || "赤チーム";
+        }
+        const blueNameInput = document.getElementById('team-blue-name');
+        if (document.activeElement !== blueNameInput) {
+            blueNameInput.value = state.blue.name || "青チーム";
+        }
 
-        // 足りない枠を空文字で埋める
-        while(teamASlots.length < 5) teamASlots.push('');
-        while(teamBSlots.length < 5) teamBSlots.push('');
+        // 人数バッジ
+        document.getElementById('red-count').innerText = `${state.red.players.length}人`;
+        document.getElementById('blue-count').innerText = `${state.blue.players.length}人`;
 
-        // シャッフル実行時は「裏返し（非公開）」の状態を強制的に維持する
-        isAllHidden = true;
+        // リスト描画
+        renderTeamList('red');
+        renderTeamList('blue');
 
-        // 再描画（裏返しのまま裏でデータがシャッフルされる）
-        renderTeams();
-        alert('裏返しのままシャッフルが完了しました！');
-    });
+        // 権限モード適用
+        applyMode(document.getElementById('mode-select').value);
+    }
 
-    // 全体めくる / 隠すトグル
-    toggleRevealBtn.addEventListener('click', () => {
-        isAllHidden = !isAllHidden;
-        renderTeams();
-    });
+    function renderTeamList(teamKey) {
+        const listEl = document.getElementById(`${teamKey}-order-list`);
+        const players = state[teamKey].players || [];
+        
+        // フォーカスを保持するため、既存の要素がある場合は極力流用、または再構築
+        listEl.innerHTML = '';
 
-    // 初回実行
-    init();
+        players.forEach((player, index) => {
+            const li = document.createElement('li');
+            li.className = 'player-item';
+            li.dataset.index = index;
+
+            const charData = CHAR_MAP[player.char] || CHAR_MAP['ryu'];
+            const iconHtml = charData.icon 
+                ? `<img src="${charData.icon}" alt="${charData.name}">` 
+                : `<span style="font-size:9px;">ランダム</span>`;
+
+            li.innerHTML = `
+                <span class="slot-number">${index + 1}</span>
+                <div class="char-icon-preview" title="クリックしてキャラクター変更" data-team="${teamKey}" data-index="${index}">
+                    ${iconHtml}
+                </div>
+                <input type="text" class="player-name-input" value="${escapeHtml(player.name || '')}" placeholder="プレイヤー名" data-team="${teamKey}" data-index="${index}">
+            `;
+
+            // キャラアイコンクリックでモーダルオープン
+            const iconPreview = li.querySelector('.char-icon-preview');
+            iconPreview.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openModal(teamKey, index);
+            });
+
+            // 名前入力イベント
+            const nameInput = li.querySelector('.player-name-input');
+            nameInput.addEventListener('input', (e) => {
+                state[teamKey].players[index].name = e.target.value;
+                saveState();
+            });
+
+            // ドラッグ＆ドロップ用ドロップ受付（枠内でのキャラ直ドロップ用）
+            li.addEventListener('dragover', (e) => e.preventDefault());
+            li.addEventListener('drop', (e) => {
+                e.preventDefault();
+                try {
+                    const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+                    if (data && data.type === 'palette-char') {
+                        state[teamKey].players[index].char = data.charId;
+                        saveState();
+                        updateUI();
+                    }
+                } catch(err) {}
+            });
+
+            listEl.appendChild(li);
+        });
+    }
+
+    // --- シャッフル機能 ---
+    function shuffleTeam(teamKey) {
+        const players = state[teamKey].players;
+        if (!players || players.length <= 1) return;
+        
+        // Fisher-Yates アルゴリズムでシャッフル
+        for (let i = players.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [players[i], players[j]] = [players[j], players[i]];
+        }
+        saveState();
+        updateUI();
+    }
+
+    function clearTeam(teamKey) {
+        if (!confirm(`${state[teamKey].name}のメンバー・オーダーをクリアしますか？`)) return;
+        state[teamKey].players.forEach(p => {
+            p.name = "";
+            p.char = "ryu";
+        });
+        saveState();
+        updateUI();
+    }
+
+    // --- モーダル制御 ---
+    function openModal(teamKey, index) {
+        activeModalTarget = { team: teamKey, index: index };
+        document.getElementById('char-modal').style.display = 'flex';
+    }
+
+    function closeModal() {
+        document.getElementById('char-modal').style.display = 'none';
+        activeModalTarget = null;
+    }
+
+    // --- モード（権限）適用 ---
+    function applyMode(mode) {
+        const redBox = document.getElementById('team-red-box');
+        const blueBox = document.getElementById('team-blue-box');
+        const sidebar = document.getElementById('sidebar-panel');
+
+        // すべての入力・ボタンの有効/無効を切り替え
+        const redInputs = redBox.querySelectorAll('input, button');
+        const blueInputs = blueBox.querySelectorAll('input, button');
+
+        let allowRed = (mode === 'all' || mode === 'red');
+        let allowBlue = (mode === 'all' || mode === 'blue');
+
+        redInputs.forEach(el => el.disabled = !allowRed);
+        blueInputs.forEach(el => el.disabled = !allowBlue);
+
+        // Sortableの有効無効切り替え
+        if (sortableRed) sortableRed.option("disabled", !allowRed);
+        if (sortableBlue) sortableBlue.option("disabled", !allowBlue);
+
+        if (mode === 'obs') {
+            // OBS表示モードの場合はUIの一部を隠すか調整
+            redInputs.forEach(el => el.disabled = true);
+            blueInputs.forEach(el => el.disabled = true);
+            if (sortableRed) sortableRed.option("disabled", true);
+            if (sortableBlue) sortableBlue.option("disabled", true);
+        }
+    }
+
+    // --- 接続ステータス表示 ---
+    function setConnectionStatus(status, text) {
+        isConnected = status;
+        const indicator = document.getElementById('connection-indicator');
+        const statusText = document.getElementById('connection-status-text');
+        if (indicator && statusText) {
+            if (status) {
+                indicator.classList.add('online');
+            } else {
+                indicator.classList.remove('online');
+            }
+            statusText.innerText = text;
+        }
+    }
+
+    function escapeHtml(str) {
+        return str.replace(/&/g, '&amp;')
+                  .replace(/</g, '&lt;')
+                  .replace(/>/g, '&gt;')
+                  .replace(/"/g, '&quot;')
+                  .replace(/'/g, '&#039;');
+    }
 </script>
+
 </body>
 </html>
