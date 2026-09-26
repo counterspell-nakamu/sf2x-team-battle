@@ -355,6 +355,7 @@
 
             <div class="mode-select">
               <label><input type="radio" name="orderMode" value="manual" checked onclick="updateModalLabels()"> 手動設定（完全自由）</label><br>
+              <label><input type="radio" name="orderMode" value="fullRandom" onclick="updateModalLabels()"> <span id="labelFullRandom">1〜16人目シャッフル（全員完全ランダム）</span></label><br>
               <label><input type="radio" name="orderMode" value="bossFixed" onclick="updateModalLabels()"> <span id="labelBossFixed">1〜15人目シャッフル ＋ 大将(16人目)固定</span></label><br>
               <label><input type="radio" name="orderMode" value="counterPick" onclick="updateModalLabels()"> <span id="labelCounterPick">先鋒申告 ＋ 2〜16人目被せ</span></label>
             </div>
@@ -495,7 +496,7 @@ window.onload = function() {
   });
 };
 
-// 2〜16の選択肢を動的生成
+// 2〜16の選択肢を動적生成
 function initSlotSelectOptions() {
   const select = document.getElementById("slotCountSelect");
   select.innerHTML = "";
@@ -526,8 +527,10 @@ function changeSlotCount(count) {
 
 function updateRuleOptionLabels() {
   const cnt = appState.slotCount || 16;
+  const labelFull = document.getElementById("labelFullRandom");
   const labelBoss = document.getElementById("labelBossFixed");
   const labelCounter = document.getElementById("labelCounterPick");
+  if (labelFull) labelFull.textContent = `1〜${cnt}人目シャッフル（全員完全ランダム）`;
   if (labelBoss) labelBoss.textContent = `1〜${cnt - 1}人目シャッフル ＋ 大将(${cnt}人目)固定`;
   if (labelCounter) labelCounter.textContent = `先鋒申告 ＋ 2〜${cnt}人目被せ`;
 }
@@ -837,12 +840,25 @@ function saveOrderModal() {
   });
 
   if (mode === 'counterPick') {
+    // 1人目は表示状態をそのまま、2〜16人目は非表示(revealed: false)にしてベンチへ
+    tempSelections[0].revealed = true;
+    for (let i = 1; i < tempSelections.length; i++) {
+      tempSelections[i].revealed = false;
+    }
     targetOrders.match = [tempSelections[0]];
     targetOrders.bench = tempSelections.slice(1);
   } else if (mode === 'bossFixed') {
     let topN = tempSelections.slice(0, slotCount - 1).sort(() => Math.random() - 0.5);
     let finalOrder = [...topN, tempSelections[slotCount - 1]];
+    // 全て非表示(revealed: false)でシャッフル
+    finalOrder.forEach(slot => slot.revealed = false);
     targetOrders.match = finalOrder;
+    targetOrders.bench = [];
+  } else if (mode === 'fullRandom') {
+    let fullShuffled = [...tempSelections].sort(() => Math.random() - 0.5);
+    // 全て非表示(revealed: false)でシャッフル
+    fullShuffled.forEach(slot => slot.revealed = false);
+    targetOrders.match = fullShuffled;
     targetOrders.bench = [];
   } else {
     targetOrders.match = tempSelections;
