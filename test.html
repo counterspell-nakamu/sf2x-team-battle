@@ -323,21 +323,22 @@
       </summary>
 
       <div class="admin-body">
-        <div class="mode-select" style="background:#20202d; margin-bottom:12px;">
-          <b>📱 端末別入力モード設定:</b><br>
-          <label><input type="radio" name="deviceRole" value="pc_all" checked onclick="setDeviceRole('pc_all')"> 💻 PC1台で両チーム分を入力する</label><br>
-          <label><input type="radio" name="deviceRole" value="p1_only" onclick="setDeviceRole('p1_only')"> 🔴 この端末は 1Pチームのみ 操作＆閲覧</label><br>
-          <label><input type="radio" name="deviceRole" value="p2_only" onclick="setDeviceRole('p2_only')"> 🔵 この端末は 2Pチームのみ 操作＆閲覧</label>
-        </div>
-
         <div class="grid-2">
           <div>
             <h3>1. プレイヤー選択（本日の参加者）</h3>
             <div id="masterChecklist" class="member-checklist"></div>
             
             <div style="display:flex; gap:5px; margin-bottom:10px;">
-              <input type="text" id="newPlayerInput" placeholder="新しいプレイヤー名を追加" style="flex:1;">
+              <input type="text" id="newPlayerInput" placeholder="新しいプレイヤー名を追加" style="flex:1;" onkeydown="handleNewPlayerKeyDown(event)">
               <button class="btn" onclick="addNewPlayer()">名簿に追加</button>
+            </div>
+
+            <!-- ハンデ戦・チーム分け設定を追加 -->
+            <div class="mode-select" style="margin-bottom:8px;">
+              <b>⚖️ チーム分けモード:</b><br>
+              <label><input type="radio" name="splitMode" value="normal" checked> 通常（半々で自動ランダム）</label><br>
+              <label><input type="radio" name="splitMode" value="handicap1_p1"> 1人(1P) vs 残り全員(2P)</label><br>
+              <label><input type="radio" name="splitMode" value="handicap1_p2"> 残り全員(1P) vs 1人(2P)</label>
             </div>
 
             <button class="btn btn-success" style="width:100%;" onclick="makeRandomTeams()">チェックした人を1P / 2Pチームに自動振り分け</button>
@@ -359,6 +360,14 @@
               <label><input type="radio" name="orderMode" value="bossFixed" onclick="updateModalLabels()"> <span id="labelBossFixed">1〜15人目シャッフル ＋ 大将(16人目)固定</span></label><br>
               <label><input type="radio" name="orderMode" value="counterPick" onclick="updateModalLabels()"> <span id="labelCounterPick">先鋒申告 ＋ 2〜16人目被せ</span></label>
             </div>
+            
+            <div class="mode-select" style="background:#20202d; margin-bottom:8px;">
+              <b>📱 端末別入力モード設定:</b><br>
+              <label><input type="radio" name="deviceRole" value="pc_all" checked onclick="setDeviceRole('pc_all')"> 💻 PC1台で両チーム分を入力する</label><br>
+              <label><input type="radio" name="deviceRole" value="p1_only" onclick="setDeviceRole('p1_only')"> 🔴 この端末は 1Pチームのみ 操作＆閲覧</label><br>
+              <label><input type="radio" name="deviceRole" value="p2_only" onclick="setDeviceRole('p2_only')"> 🔵 この端末は 2Pチームのみ 操作＆閲覧</label>
+            </div>
+
             <div style="display:flex; flex-direction:column; gap:10px;">
               <button id="btnOpenP1" class="btn btn-success" onclick="openOrderModal('1')">🔴 1Pチーム オーダー設定</button>
               <button id="btnOpenP2" class="btn btn-success" onclick="openOrderModal('2')">🔵 2Pチーム オーダー設定</button>
@@ -496,7 +505,7 @@ window.onload = function() {
   });
 };
 
-// 2〜16の選択肢を動적生成
+// 2〜16の選択肢を動的生成
 function initSlotSelectOptions() {
   const select = document.getElementById("slotCountSelect");
   select.innerHTML = "";
@@ -599,21 +608,47 @@ function createOrdersEmpty() {
   return { match: orders, bench: [] };
 }
 
+// チェック状態の保存キー
+function getStorageKey() {
+  return `sf2x_checklist_${currentRoom}`;
+}
+
 function renderMasterChecklist() {
   const container = document.getElementById("masterChecklist");
   if (!container) return;
   container.innerHTML = "";
   if (!appState.masterPlayers) appState.masterPlayers = [...defaultPlayers];
+
+  // ローカルストレージからチェック状態を取得
+  let savedChecks = {};
+  try {
+    const saved = localStorage.getItem(getStorageKey());
+    if (saved) savedChecks = JSON.parse(saved);
+  } catch(e) {}
   
   appState.masterPlayers.forEach((p, idx) => {
     const item = document.createElement("div");
     item.className = "member-item";
+    
+    // 保存された状態があればそれを適用、なければデフォルトでchecked
+    let isChecked = (savedChecks[p] !== undefined) ? savedChecks[p] : true;
+
     item.innerHTML = `
-      <label><input type="checkbox" class="player-chk" value="${escapeHTML(p)}" checked> ${escapeHTML(p)}</label>
+      <label><input type="checkbox" class="player-chk" value="${escapeHTML(p)}" ${isChecked ? 'checked' : ''} onchange="saveChecklistState()"> ${escapeHTML(p)}</label>
       <button class="btn-del" onclick="deletePlayer(${idx})">×</button>
     `;
     container.appendChild(item);
   });
+}
+
+function saveChecklistState() {
+  let states = {};
+  document.querySelectorAll(".player-chk").forEach(cb => {
+    states[cb.value] = cb.checked;
+  });
+  try {
+    localStorage.setItem(getStorageKey(), JSON.stringify(states));
+  } catch(e) {}
 }
 
 function addNewPlayer() {
@@ -622,13 +657,33 @@ function addNewPlayer() {
   if (!name) return;
   if (!appState.masterPlayers.includes(name)) {
     appState.masterPlayers.push(name);
+    // 追加時はデフォルトでチェックON状態として保存
+    try {
+      let saved = JSON.parse(localStorage.getItem(getStorageKey()) || "{}");
+      saved[name] = true;
+      localStorage.setItem(getStorageKey(), JSON.stringify(saved));
+    } catch(e) {}
     syncToFirebase();
   }
   input.value = "";
 }
 
+// エンターキーで新しいプレイヤーを追加できるようにする
+function handleNewPlayerKeyDown(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    addNewPlayer();
+  }
+}
+
 function deletePlayer(index) {
+  const pName = appState.masterPlayers[index];
   appState.masterPlayers.splice(index, 1);
+  try {
+    let saved = JSON.parse(localStorage.getItem(getStorageKey()) || "{}");
+    delete saved[pName];
+    localStorage.setItem(getStorageKey(), JSON.stringify(saved));
+  } catch(e) {}
   syncToFirebase();
 }
 
@@ -640,11 +695,24 @@ function makeRandomTeams() {
     return;
   }
 
+  const splitMode = document.querySelector('input[name="splitMode"]:checked').value;
   let shuffled = [...selectedPlayers].sort(() => Math.random() - 0.5);
-  const half = Math.ceil(shuffled.length / 2);
-  
-  appState.team1Members = shuffled.slice(0, half);
-  appState.team2Members = shuffled.slice(half);
+
+  if (splitMode === 'handicap1_p1') {
+    // 1Pが1人、2Pが残り全員
+    appState.team1Members = [shuffled[0]];
+    appState.team2Members = shuffled.slice(1);
+  } else if (splitMode === 'handicap1_p2') {
+    // 1Pが残り全員、2Pが1人
+    appState.team1Members = shuffled.slice(1);
+    appState.team2Members = [shuffled[0]];
+  } else {
+    // 通常半々
+    const half = Math.ceil(shuffled.length / 2);
+    appState.team1Members = shuffled.slice(0, half);
+    appState.team2Members = shuffled.slice(half);
+  }
+
   appState.team1Orders = createOrdersEmpty();
   appState.team2Orders = createOrdersEmpty();
   appState.isOrderSet = false;
@@ -840,7 +908,7 @@ function saveOrderModal() {
   });
 
   if (mode === 'counterPick') {
-    // 1人目は表示状態をそのまま、2〜16人目は非表示(revealed: false)にしてベンチへ
+    // 1人目は表示状態、2〜16人目は非表示(revealed: false)にしてベンチへ
     tempSelections[0].revealed = true;
     for (let i = 1; i < tempSelections.length; i++) {
       tempSelections[i].revealed = false;
@@ -850,13 +918,13 @@ function saveOrderModal() {
   } else if (mode === 'bossFixed') {
     let topN = tempSelections.slice(0, slotCount - 1).sort(() => Math.random() - 0.5);
     let finalOrder = [...topN, tempSelections[slotCount - 1]];
-    // 全て非表示(revealed: false)でシャッフル
+    // 【見えないシャッフル対応】完全ランダム設定時は初期からすべて非表示（？マーク）にする
     finalOrder.forEach(slot => slot.revealed = false);
     targetOrders.match = finalOrder;
     targetOrders.bench = [];
   } else if (mode === 'fullRandom') {
     let fullShuffled = [...tempSelections].sort(() => Math.random() - 0.5);
-    // 全て非表示(revealed: false)でシャッフル
+    // 【見えないシャッフル対応】完全ランダム設定時は初期からすべて非表示（？マーク）にする
     fullShuffled.forEach(slot => slot.revealed = false);
     targetOrders.match = fullShuffled;
     targetOrders.bench = [];
